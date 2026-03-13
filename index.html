@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Meals</title>
+  <link rel="stylesheet" href="src/style.css">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen">
+    <div class="login-card">
+      <h1>Family Meals</h1>
+      <p class="login-subtitle">Plan meals, rate recipes, and coordinate dinner as a family.</p>
+      <div id="login-form">
+        <button id="google-signin-btn" class="btn login-btn google-btn">Sign in with Google</button>
+        <div class="login-divider"><span>or</span></div>
+        <input type="email" id="login-email" placeholder="Email address">
+        <input type="password" id="login-password" placeholder="Password">
+        <div class="login-actions">
+          <button id="email-signin-btn" class="btn primary login-btn">Sign In</button>
+          <button id="email-signup-btn" class="btn login-btn">Create Account</button>
+        </div>
+        <p id="login-error" class="login-error hidden"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Household Setup (shown after login if no household) -->
+  <div id="household-setup" class="hidden">
+    <div class="login-card">
+      <h1>Welcome!</h1>
+      <p class="login-subtitle">Create a new household or join an existing one.</p>
+
+      <div id="household-create-section">
+        <h3>Create a Household</h3>
+        <input type="text" id="household-name" placeholder="Household name (e.g. The Smiths)">
+        <input type="text" id="household-members" placeholder="Family members (comma separated)">
+        <button id="create-household-btn" class="btn primary login-btn">Create Household</button>
+      </div>
+
+      <div class="login-divider"><span>or</span></div>
+
+      <div id="household-join-section">
+        <h3>Join a Household</h3>
+        <input type="text" id="join-invite-code" placeholder="Enter invite code" style="text-transform:uppercase">
+        <button id="join-household-btn" class="btn login-btn">Join</button>
+      </div>
+
+      <p id="household-error" class="login-error hidden"></p>
+      <button id="household-signout-btn" class="sign-out-btn" style="margin-top:1.5rem">Sign out and use a different account</button>
+    </div>
+  </div>
+
+  <!-- App (hidden until authenticated + household set) -->
+  <div id="app-container" class="hidden">
+  <header>
+    <h1 id="home-link" style="cursor:pointer">Family Meals</h1>
+    <nav id="main-nav">
+      <button class="nav-btn active" data-page="home">Home</button>
+      <button class="nav-btn primary-nav" data-page="preferences">Rate Recipes</button>
+      <button class="nav-btn primary-nav" data-page="recipes">Recipes</button>
+      <button class="nav-btn primary-nav" data-page="plan-view">This Week</button>
+      <span class="nav-sep"></span>
+      <button class="nav-btn" data-page="planner">Plan Week</button>
+      <button class="nav-btn" data-page="grocery">Ingredients</button>
+      <button class="nav-btn" data-page="experiments">Experiments</button>
+      <button class="nav-btn" data-page="manage">Manage</button>
+    </nav>
+    <div id="user-info">
+      <span id="user-display-name"></span>
+      <button id="sign-out-btn" class="sign-out-btn">Sign Out</button>
+    </div>
+    <div id="member-picker">
+      <label>Who are you?</label>
+      <select id="current-member">
+        <option value="">Select...</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <!-- Home Page -->
+    <section id="page-home" class="page active">
+      <div class="home-grid main-tiles">
+        <button class="home-card" data-page="preferences">
+          <span class="home-card-icon">&#11088;</span>
+          <span class="home-card-title">Rate Recipes</span>
+          <span class="home-card-desc">Tell us what you love, like, or can't stand</span>
+        </button>
+        <button class="home-card" data-page="recipes">
+          <span class="home-card-icon">&#128214;</span>
+          <span class="home-card-title">Browse Recipes</span>
+          <span class="home-card-desc">Search and view all family recipes</span>
+        </button>
+        <button class="home-card" data-page="plan-view">
+          <span class="home-card-icon">&#128197;</span>
+          <span class="home-card-title">This Week's Plan</span>
+          <span class="home-card-desc">See what's for dinner and leave comments</span>
+        </button>
+      </div>
+      <h3 class="home-section-label">Admin Tasks</h3>
+      <div class="home-grid admin-tiles">
+        <button class="home-card small" data-page="planner">
+          <span class="home-card-icon">&#129668;</span>
+          <span class="home-card-title">Plan the Week</span>
+        </button>
+        <button class="home-card small" data-page="grocery">
+          <span class="home-card-icon">&#128722;</span>
+          <span class="home-card-title">Meal Plan &amp; Ingredients</span>
+        </button>
+        <button class="home-card small" data-page="experiments">
+          <span class="home-card-icon">&#129514;</span>
+          <span class="home-card-title">Experiments</span>
+        </button>
+        <button class="home-card small" data-page="manage">
+          <span class="home-card-icon">&#9998;</span>
+          <span class="home-card-title">Manage Recipes</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Recipes Page -->
+    <section id="page-recipes" class="page hidden">
+      <div class="page-header">
+        <h2>All Recipes</h2>
+        <input type="text" id="recipe-search" placeholder="Search recipes...">
+      </div>
+      <div id="recipe-list" class="recipe-grid"></div>
+      <!-- Recipe Detail Modal -->
+      <div id="recipe-modal" class="modal hidden">
+        <div class="modal-content">
+          <button class="modal-close">&times;</button>
+          <div id="recipe-detail"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Preferences Page -->
+    <section id="page-preferences" class="page hidden">
+      <div class="page-header">
+        <h2>Rate Recipes</h2>
+        <input type="text" id="pref-search" placeholder="Search recipes...">
+        <div id="pref-filter-bar">
+          <label><input type="checkbox" id="pref-filter-unrated" checked> Show unrated only</label>
+        </div>
+      </div>
+      <div id="pref-list"></div>
+    </section>
+
+    <!-- Planner Page -->
+    <section id="page-planner" class="page hidden">
+      <div class="page-header">
+        <h2>Plan the Week</h2>
+        <div class="week-selector">
+          <button id="prev-week">&laquo; Prev</button>
+          <span id="week-label"></span>
+          <button id="next-week">Next &raquo;</button>
+        </div>
+      </div>
+      <p class="planner-instructions">Set who's home and any constraints for each day, then hit <strong>Suggest Meals</strong>. The system picks a varied menu avoiding repeated proteins and recent weeks' meals.</p>
+      <div id="planner-grid"></div>
+      <div class="planner-actions">
+        <button id="suggest-all-btn" class="btn primary large">Suggest Meals</button>
+        <button id="clear-all-btn" class="btn">Clear All</button>
+        <button id="commit-plan-btn" class="btn commit">Commit This Plan</button>
+      </div>
+      <div id="commit-status"></div>
+    </section>
+
+    <!-- This Week View -->
+    <section id="page-plan-view" class="page hidden">
+      <div class="page-header">
+        <h2>Meal Plan</h2>
+        <div class="week-selector">
+          <button id="view-prev-week">&laquo; Prev</button>
+          <span id="view-week-label"></span>
+          <button id="view-next-week">Next &raquo;</button>
+        </div>
+      </div>
+      <div id="plan-view-grid"></div>
+      <div id="comments-section">
+        <h3>Comments</h3>
+        <div id="comments-list"></div>
+        <div id="comment-form">
+          <textarea id="comment-text" placeholder="Add a comment..."></textarea>
+          <button id="add-comment-btn" class="btn">Add Comment</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grocery List Page -->
+    <section id="page-grocery" class="page hidden">
+      <div class="page-header">
+        <h2>Meal Plan &amp; Ingredients</h2>
+        <div class="week-selector">
+          <button id="grocery-prev-week">&laquo; Prev</button>
+          <span id="grocery-week-label"></span>
+          <button id="grocery-next-week">Next &raquo;</button>
+        </div>
+      </div>
+      <div id="grocery-list"></div>
+      <button id="copy-grocery-btn" class="btn">Copy to Clipboard</button>
+      <button id="email-plan-btn" class="btn primary">Email Plan + Grocery List</button>
+    </section>
+
+    <!-- Experiments Page -->
+    <section id="page-experiments" class="page hidden">
+      <div class="page-header">
+        <h2>Experiments</h2>
+      </div>
+      <p class="planner-instructions">Recipes we haven't tried yet. The planner suggests one experiment per week on weekends. After trying one, rate it here — successes join the regular rotation, failures get removed.</p>
+      <div id="experiments-list"></div>
+    </section>
+
+    <!-- Manage Recipes Page -->
+    <section id="page-manage" class="page hidden">
+      <h2>Manage Recipes</h2>
+
+      <!-- Import Recipes -->
+      <div id="import-recipe-section" class="manage-section">
+        <h3>Import Recipes</h3>
+        <p class="section-help">Upload a JSON or CSV file to import recipes in bulk.</p>
+        <div class="import-controls">
+          <label class="btn file-upload-btn">
+            Choose File
+            <input type="file" id="import-file" accept=".json,.csv" hidden>
+          </label>
+          <span id="import-file-name" class="import-file-name">No file chosen</span>
+        </div>
+        <div id="import-preview" class="hidden">
+          <div id="import-summary"></div>
+          <div id="import-sample"></div>
+          <div class="import-actions">
+            <button id="import-confirm-btn" class="btn primary">Import All</button>
+            <button id="import-cancel-btn" class="btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Single Recipe -->
+      <div id="add-recipe-form" class="manage-section">
+        <h3>Add a Recipe</h3>
+        <input type="text" id="new-recipe-name" placeholder="Recipe name" required>
+        <textarea id="new-recipe-ingredients" placeholder="Ingredients (one per line)"></textarea>
+        <textarea id="new-recipe-directions" placeholder="Directions"></textarea>
+        <div class="form-row">
+          <input type="text" id="new-recipe-servings" placeholder="Servings">
+          <input type="text" id="new-recipe-prep" placeholder="Prep time">
+          <input type="text" id="new-recipe-cook" placeholder="Cook time">
+        </div>
+        <input type="text" id="new-recipe-categories" placeholder="Categories (comma separated)">
+        <input type="text" id="new-recipe-source" placeholder="Source / URL">
+        <textarea id="new-recipe-notes" placeholder="Notes"></textarea>
+        <button id="save-recipe-btn" class="btn primary">Save Recipe</button>
+      </div>
+
+      <!-- Recipe List -->
+      <div id="manage-recipe-list-section" class="manage-section">
+        <h3>All Recipes <span id="manage-recipe-count"></span></h3>
+        <input type="text" id="manage-search" placeholder="Search recipes...">
+        <div id="manage-recipe-list"></div>
+      </div>
+    </section>
+  </main>
+  </div><!-- /app-container -->
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
