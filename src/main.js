@@ -7,7 +7,7 @@ import { renderGroceryList, getGroceryText, clearChecked } from './grocery.js';
 import { renderFeedbackPage } from './feedback.js';
 
 // === State ===
-const BETA_CODE = 'FAMILYMEALS2026';
+const BETA_CODE = 'MEALS2026';
 let members = [];
 let appInitialized = false;
 
