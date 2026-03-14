@@ -202,18 +202,15 @@ export function setMembers(members) {
   updateHouseholdMembers(members);
 }
 
-// === Preferences ===
+// === Preferences (per recipe, not per member) ===
 
-export async function savePreference(recipeUid, memberName, rating, flags) {
+export async function saveRecipePrefs(recipeUid, prefs) {
+  const data = { ...prefs, updated: Date.now() };
   if (!firebaseEnabled) {
-    const key = `pref_${recipeUid}_${memberName}`;
-    localStorage.setItem(key, JSON.stringify({ rating, flags, updated: Date.now() }));
+    localStorage.setItem(`rpref_${recipeUid}`, JSON.stringify(data));
     return;
   }
-  const docId = `${recipeUid}_${memberName}`;
-  await col("preferences").doc(docId).set({
-    recipeUid, memberName, rating, flags, updated: Date.now()
-  });
+  await col("preferences").doc(recipeUid).set(data);
 }
 
 export async function loadAllPreferences() {
@@ -221,8 +218,8 @@ export async function loadAllPreferences() {
     const prefs = {};
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key.startsWith("pref_")) {
-        prefs[key.slice(5)] = JSON.parse(localStorage.getItem(key));
+      if (key.startsWith("rpref_")) {
+        prefs[key.slice(6)] = JSON.parse(localStorage.getItem(key));
       }
     }
     return prefs;
@@ -377,35 +374,3 @@ export async function loadHouseholdRecipes() {
   });
 }
 
-// === Weekly Feedback ===
-
-export async function saveFeedbackVote(weekKey, recipeUid, memberName, vote) {
-  const docId = `${weekKey}_${recipeUid}_${memberName}`;
-  const data = { weekKey, recipeUid, memberName, vote, timestamp: Date.now() };
-  if (!firebaseEnabled) {
-    const feedback = JSON.parse(localStorage.getItem("feedback_votes") || "{}");
-    feedback[docId] = data;
-    localStorage.setItem("feedback_votes", JSON.stringify(feedback));
-    return;
-  }
-  await col("feedback").doc(docId).set(data);
-}
-
-export async function loadFeedbackForWeek(weekKey) {
-  if (!firebaseEnabled) {
-    const all = JSON.parse(localStorage.getItem("feedback_votes") || "{}");
-    const votes = {};
-    for (const [id, data] of Object.entries(all)) {
-      if (data.weekKey === weekKey) {
-        votes[id] = data;
-      }
-    }
-    return votes;
-  }
-  const snapshot = await col("feedback")
-    .where("weekKey", "==", weekKey)
-    .get();
-  const votes = {};
-  snapshot.forEach(doc => { votes[doc.id] = doc.data(); });
-  return votes;
-}

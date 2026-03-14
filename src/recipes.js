@@ -23,7 +23,7 @@ export function getRecipeByUid(uid) {
   return allRecipes.find(r => r.uid === uid);
 }
 
-export function renderRecipeList(container, recipes, onClick, preferences, { currentMember, onToggleFavorite } = {}) {
+export function renderRecipeList(container, recipes, onClick, preferences, { onToggleFavorite } = {}) {
   container.innerHTML = '';
   if (!recipes.length) {
     container.innerHTML = '<p style="color:var(--text-light);padding:2rem;">No recipes found.</p>';
@@ -43,14 +43,13 @@ export function renderRecipeList(container, recipes, onClick, preferences, { cur
     const cats = (r.categories || [])
       .map(c => `<span class="category-tag">${esc(c)}</span>`).join('');
 
-    // Build rating summary from preferences
-    const ratingHtml = buildRatingSummary(r.uid, preferences);
+    // Build status summary from preferences
+    const statusHtml = buildStatusSummary(r.uid, preferences);
 
     // Favorite button
-    const isFav = currentMember && preferences?.[`${r.uid}_${currentMember}`]?.flags?.favorite;
-    const favHtml = currentMember
-      ? `<button class="fav-btn ${isFav ? 'active' : ''}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '\u2764' : '\u2661'}</button>`
-      : '';
+    const pref = preferences?.[r.uid];
+    const isFav = pref?.favorite;
+    const favHtml = `<button class="fav-btn ${isFav ? 'active' : ''}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '\u2764' : '\u2661'}</button>`;
 
     card.innerHTML = `
       <div class="recipe-card-top">
@@ -58,7 +57,7 @@ export function renderRecipeList(container, recipes, onClick, preferences, { cur
         ${favHtml}
       </div>
       <div class="recipe-meta">${meta.map(m => `<span>${esc(m)}</span>`).join('')}</div>
-      ${ratingHtml}
+      ${statusHtml}
       ${cats ? `<div class="recipe-categories">${cats}</div>` : ''}
     `;
 
@@ -79,28 +78,27 @@ export function renderRecipeList(container, recipes, onClick, preferences, { cur
   }
 }
 
-function buildRatingSummary(recipeUid, preferences) {
+function buildStatusSummary(recipeUid, preferences) {
   if (!preferences) return '';
+  const pref = preferences[recipeUid];
+  if (!pref) return '';
 
-  // Collect ratings for this recipe from all members
-  const ratings = [];
-  for (const [key, val] of Object.entries(preferences)) {
-    if (key.startsWith(recipeUid + '_') && val.rating && val.rating !== 'unknown') {
-      const member = key.slice(recipeUid.length + 1);
-      ratings.push({ member, rating: val.rating });
+  const chips = [];
+
+  if (pref.favorite) {
+    chips.push('<span class="status-chip favorite">\u2764 Favorite</span>');
+  }
+  if (pref.makeAhead) {
+    chips.push('<span class="status-chip make-ahead">Make Ahead</span>');
+  }
+  if (pref.doesntEat?.length) {
+    for (const m of pref.doesntEat) {
+      chips.push(`<span class="status-chip doesnt-eat">${esc(m)} won't eat</span>`);
     }
   }
 
-  if (!ratings.length) return '<div class="recipe-ratings unrated">No ratings yet</div>';
-
-  const icons = { love: '\u2764', like: '\u{1F44D}', acceptable: '\u2713', unacceptable: '\u2717' };
-  const classes = { love: 'love', like: 'like', acceptable: 'ok', unacceptable: 'nope' };
-
-  const dots = ratings.map(r =>
-    `<span class="rating-dot ${classes[r.rating]}" title="${esc(r.member)}: ${r.rating}">${icons[r.rating]}</span>`
-  ).join('');
-
-  return `<div class="recipe-ratings">${dots}</div>`;
+  if (!chips.length) return '';
+  return `<div class="recipe-status">${chips.join('')}</div>`;
 }
 
 export function renderRecipeDetail(container, recipe) {

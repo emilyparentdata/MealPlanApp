@@ -23,8 +23,6 @@ export async function renderGroceryList(container, weekLabelEl) {
     if (!dayData) continue;
     if (dayData.skip) {
       meals.push({ day, type: 'skip' });
-    } else if (dayData.leftover) {
-      meals.push({ day, type: 'leftover' });
     } else if (dayData.recipeUid) {
       const recipe = getRecipeByUid(dayData.recipeUid);
       if (recipe) {
@@ -43,8 +41,6 @@ export async function renderGroceryList(container, weekLabelEl) {
   for (const m of meals) {
     if (m.type === 'skip') {
       html += `<div class="grocery-day"><h3>${m.day}</h3><p class="grocery-skip">Skipped</p></div>`;
-    } else if (m.type === 'leftover') {
-      html += `<div class="grocery-day"><h3>${m.day}</h3><p class="grocery-skip">Leftover/Choice</p></div>`;
     } else {
       const sides = m.sides ? `<span class="meal-sides">+ ${escHtml(m.sides)}</span>` : '';
       const ingredients = m.recipe.ingredients
@@ -72,8 +68,6 @@ function buildFullText(meals) {
   for (const m of meals) {
     if (m.type === 'skip') {
       lines.push(`${m.day}: Skipped`);
-    } else if (m.type === 'leftover') {
-      lines.push(`${m.day}: Leftover/Choice`);
     } else {
       let header = `${m.day}: ${m.recipe.name}`;
       if (m.sides) header += ` + ${m.sides}`;

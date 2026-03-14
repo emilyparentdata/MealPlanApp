@@ -1,38 +1,55 @@
-import { savePreference, loadAllPreferences } from './firebase.js';
+import { saveRecipePrefs, loadAllPreferences, getMembers } from './firebase.js';
 import { getRecipes } from './recipes.js';
 
-let preferences = {}; // keyed by "recipeUid_memberName"
+// Keyed by recipeUid: { doesntEat: [...members], makeAhead: bool, favorite: bool }
+let preferences = {};
 
 export async function initPreferences() {
   preferences = await loadAllPreferences();
 }
 
-export function getPreference(recipeUid, memberName) {
-  return preferences[`${recipeUid}_${memberName}`] || null;
+export function getRecipePrefs(recipeUid) {
+  return preferences[recipeUid] || { doesntEat: [], makeAhead: false, favorite: false };
 }
 
 export function getAllPreferences() {
   return preferences;
 }
 
-export function getRecipePreferences(recipeUid) {
-  const result = {};
-  for (const [key, val] of Object.entries(preferences)) {
-    if (key.startsWith(recipeUid + '_')) {
-      const member = key.slice(recipeUid.length + 1);
-      result[member] = val;
-    }
-  }
-  return result;
+export async function updateRecipePrefs(recipeUid, prefs) {
+  preferences[recipeUid] = { ...prefs };
+  await saveRecipePrefs(recipeUid, prefs);
 }
 
-export function renderPreferenceList(container, recipes, currentMember, searchQuery, showUnratedOnly) {
-  container.innerHTML = '';
+export async function toggleFavorite(recipeUid) {
+  const current = getRecipePrefs(recipeUid);
+  current.favorite = !current.favorite;
+  await updateRecipePrefs(recipeUid, current);
+  return current.favorite;
+}
 
-  if (!currentMember) {
-    container.innerHTML = '<p style="color:var(--text-light);padding:2rem;">Please select your name above to rate recipes.</p>';
-    return;
+export async function toggleDoesntEat(recipeUid, memberName) {
+  const current = getRecipePrefs(recipeUid);
+  const list = current.doesntEat || [];
+  if (list.includes(memberName)) {
+    current.doesntEat = list.filter(m => m !== memberName);
+  } else {
+    current.doesntEat = [...list, memberName];
   }
+  await updateRecipePrefs(recipeUid, current);
+  return current.doesntEat;
+}
+
+export async function toggleMakeAhead(recipeUid) {
+  const current = getRecipePrefs(recipeUid);
+  current.makeAhead = !current.makeAhead;
+  await updateRecipePrefs(recipeUid, current);
+  return current.makeAhead;
+}
+
+export function renderPreferenceList(container, recipes, searchQuery, showUnratedOnly) {
+  container.innerHTML = '';
+  const members = getMembers();
 
   let filtered = recipes;
   if (searchQuery) {
@@ -43,7 +60,7 @@ export function renderPreferenceList(container, recipes, currentMember, searchQu
     );
   }
   if (showUnratedOnly) {
-    filtered = filtered.filter(r => !getPreference(r.uid, currentMember));
+    filtered = filtered.filter(r => !preferences[r.uid]);
   }
 
   if (!filtered.length) {
@@ -52,81 +69,56 @@ export function renderPreferenceList(container, recipes, currentMember, searchQu
   }
 
   for (const r of filtered) {
-    const pref = getPreference(r.uid, currentMember);
-    const currentRating = pref?.rating || '';
-    const flags = pref?.flags || {};
+    const prefs = getRecipePrefs(r.uid);
 
     const row = document.createElement('div');
     row.className = 'pref-row';
     row.innerHTML = `
       <span class="recipe-name">${escHtml(r.name)}</span>
-      <div class="rating-btns">
-        ${['love', 'like', 'acceptable', 'unacceptable', 'unknown'].map(rating =>
-          `<button class="rating-btn ${currentRating === rating ? 'selected' : ''}" data-rating="${rating}">${ratingLabel(rating)}</button>`
-        ).join('')}
-      </div>
-      <div class="flag-btns">
-        <button class="flag-btn ${flags.makeAhead ? 'active' : ''}" data-flag="makeAhead">Make Ahead</button>
-        <button class="flag-btn ${flags.dadCanMake ? 'active' : ''}" data-flag="dadCanMake">Dad Can Make</button>
+      <div class="pref-controls">
+        <div class="doesnt-eat-btns">
+          <span class="pref-label">Doesn't eat:</span>
+          ${members.map(m => `
+            <button class="flag-btn doesnt-eat-btn ${(prefs.doesntEat || []).includes(m) ? 'active' : ''}" data-member="${escAttr(m)}">${escHtml(m)}</button>
+          `).join('')}
+        </div>
+        <div class="pref-flags">
+          <button class="flag-btn ${prefs.makeAhead ? 'active' : ''}" data-action="makeAhead">Make Ahead</button>
+          <button class="flag-btn fav-flag ${prefs.favorite ? 'active' : ''}" data-action="favorite">\u2764 Favorite</button>
+        </div>
       </div>
     `;
 
-    // Rating button clicks
-    row.querySelectorAll('.rating-btn').forEach(btn => {
+    // "Doesn't eat" toggles
+    row.querySelectorAll('.doesnt-eat-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const rating = btn.dataset.rating;
-        const currentPref = getPreference(r.uid, currentMember);
-        const currentFlags = currentPref?.flags || {};
-        await setPreference(r.uid, currentMember, rating, currentFlags);
-        // Update UI
-        row.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
+        await toggleDoesntEat(r.uid, btn.dataset.member);
+        btn.classList.toggle('active');
       });
     });
 
-    // Flag button clicks
-    row.querySelectorAll('.flag-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const flag = btn.dataset.flag;
-        const currentPref = getPreference(r.uid, currentMember);
-        const currentRating = currentPref?.rating || 'acceptable';
-        const currentFlags = { ...(currentPref?.flags || {}) };
-        currentFlags[flag] = !currentFlags[flag];
-        await setPreference(r.uid, currentMember, currentRating, currentFlags);
-        btn.classList.toggle('active');
-      });
+    // Make ahead toggle
+    row.querySelector('[data-action="makeAhead"]').addEventListener('click', async (e) => {
+      await toggleMakeAhead(r.uid);
+      e.target.classList.toggle('active');
+    });
+
+    // Favorite toggle
+    row.querySelector('[data-action="favorite"]').addEventListener('click', async (e) => {
+      await toggleFavorite(r.uid);
+      e.target.classList.toggle('active');
     });
 
     container.appendChild(row);
   }
 }
 
-async function setPreference(recipeUid, memberName, rating, flags) {
-  const key = `${recipeUid}_${memberName}`;
-  preferences[key] = { rating, flags, updated: Date.now() };
-  await savePreference(recipeUid, memberName, rating, flags);
-}
-
-function ratingLabel(rating) {
-  return { love: 'Love It', like: 'Like It', acceptable: 'Acceptable', unknown: "Don't Know", unacceptable: 'Unacceptable' }[rating] || rating;
-}
-
-export async function toggleFavorite(recipeUid, memberName) {
-  const pref = getPreference(recipeUid, memberName);
-  const rating = pref?.rating || 'unknown';
-  const flags = { ...(pref?.flags || {}) };
-  flags.favorite = !flags.favorite;
-  await setPreference(recipeUid, memberName, rating, flags);
-  return flags.favorite;
-}
-
-export function isFavorite(recipeUid, memberName) {
-  const pref = getPreference(recipeUid, memberName);
-  return !!(pref?.flags?.favorite);
-}
-
 function escHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+
+function escAttr(str) {
+  return (str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

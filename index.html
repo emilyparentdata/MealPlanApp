@@ -25,6 +25,7 @@
           <button id="email-signin-btn" class="btn primary login-btn">Sign In</button>
           <button id="email-signup-btn" class="btn login-btn">Create Account</button>
         </div>
+        <input type="text" id="beta-code" placeholder="Beta access code (for new accounts)" class="beta-code-input">
         <p id="login-error" class="login-error hidden"></p>
       </div>
     </div>
@@ -40,6 +41,10 @@
         <h3>Create a Household</h3>
         <input type="text" id="household-name" placeholder="Household name (e.g. The Smiths)">
         <input type="text" id="household-members" placeholder="Family members (comma separated)">
+        <div id="starter-packs" class="starter-packs">
+          <p class="starter-packs-label">Start with some recipes? (optional)</p>
+          <div id="starter-pack-options"></div>
+        </div>
         <button id="create-household-btn" class="btn primary login-btn">Create Household</button>
       </div>
 
@@ -73,13 +78,8 @@
     </nav>
     <div id="user-info">
       <span id="user-display-name"></span>
+      <button id="invite-code-btn" class="sign-out-btn" title="Click to copy invite code">Invite: <span id="invite-code-display"></span></button>
       <button id="sign-out-btn" class="sign-out-btn">Sign Out</button>
-    </div>
-    <div id="member-picker">
-      <label>Who are you?</label>
-      <select id="current-member">
-        <option value="">Select...</option>
-      </select>
     </div>
   </header>
 
@@ -90,7 +90,7 @@
         <button class="home-card" data-page="preferences">
           <span class="home-card-icon">&#11088;</span>
           <span class="home-card-title">Rate Recipes</span>
-          <span class="home-card-desc">Tell us what you love, like, or can't stand</span>
+          <span class="home-card-desc">Mark who doesn't eat what, favorites, and make-ahead</span>
         </button>
         <button class="home-card" data-page="recipes">
           <span class="home-card-icon">&#128214;</span>
@@ -146,7 +146,7 @@
         <h2>Rate Recipes</h2>
         <input type="text" id="pref-search" placeholder="Search recipes...">
         <div id="pref-filter-bar">
-          <label><input type="checkbox" id="pref-filter-unrated" checked> Show unrated only</label>
+          <label><input type="checkbox" id="pref-filter-unrated"> Show unset only</label>
         </div>
       </div>
       <div id="pref-list"></div>
@@ -183,14 +183,6 @@
         </div>
       </div>
       <div id="plan-view-grid"></div>
-      <div id="comments-section">
-        <h3>Comments</h3>
-        <div id="comments-list"></div>
-        <div id="comment-form">
-          <textarea id="comment-text" placeholder="Add a comment..."></textarea>
-          <button id="add-comment-btn" class="btn">Add Comment</button>
-        </div>
-      </div>
     </section>
 
     <!-- Grocery List Page -->
@@ -220,6 +212,14 @@
     <!-- Manage Recipes Page -->
     <section id="page-manage" class="page hidden">
       <h2>Manage Recipes</h2>
+
+      <!-- Starter Recipes -->
+      <div id="starter-recipe-section" class="manage-section">
+        <h3>Add Starter Recipes</h3>
+        <p class="section-help">Pick from curated recipe packs to get started quickly.</p>
+        <div id="manage-starter-packs"></div>
+        <button id="add-starter-btn" class="btn primary" style="margin-top:0.75rem">Add Selected Recipes</button>
+      </div>
 
       <!-- Import from URL -->
       <div id="url-import-section" class="manage-section">

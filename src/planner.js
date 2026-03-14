@@ -227,37 +227,21 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     // Don't repeat within the same week
     if (assignedThisWeek.has(recipe.uid)) continue;
 
-    // Check constraints
-    if (dayData.makeAhead) {
-      const hasMakeAhead = Object.entries(prefs).some(([key, val]) =>
-        key.startsWith(recipe.uid + '_') && val.flags?.makeAhead
-      );
-      if (!hasMakeAhead) continue;
-    }
+    const recipePref = prefs[recipe.uid] || {};
 
-    // Check acceptability for everyone home
-    // Default: all meals acceptable unless someone rates "unacceptable"
-    let score = 0;
-    let acceptable = true;
-    let hasFavorite = false;
-    for (const member of dayData.whoHome) {
-      const pref = prefs[`${recipe.uid}_${member}`];
-      if (pref?.flags?.favorite) hasFavorite = true;
-      if (!pref || !pref.rating || pref.rating === 'unknown') {
-        // No rating or "don't know" — treat as acceptable (default assumption)
-        score += 2;
-        continue;
-      }
-      if (pref.rating === 'unacceptable') {
-        acceptable = false;
-        break;
-      }
-      score += { love: 4, like: 3, acceptable: 2 }[pref.rating] || 2;
-    }
-    if (!acceptable) continue;
+    // Check constraints
+    if (dayData.makeAhead && !recipePref.makeAhead) continue;
+
+    // Skip if anyone home doesn't eat this
+    const doesntEat = recipePref.doesntEat || [];
+    const blocked = dayData.whoHome.some(member => doesntEat.includes(member));
+    if (blocked) continue;
+
+    // Base score: everyone home can eat it
+    let score = dayData.whoHome.length * 2;
 
     // Boost favorited recipes
-    if (hasFavorite) score += 3;
+    if (recipePref.favorite) score += 3;
 
     // Protein variety bonus/penalty
     const recipeProteins = detectProtein(recipe);

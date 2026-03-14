@@ -1,14 +1,14 @@
-import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes } from './firebase.js';
+import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes } from './firebase.js';
 import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, renderPreferenceList, getAllPreferences, toggleFavorite } from './preferences.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey } from './planner.js';
-import { renderPlanView, handleAddComment } from './plan-view.js';
+import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText } from './grocery.js';
 import { sendPlanEmail, isEmailConfigured } from './email.js';
 import { renderFeedbackPage } from './feedback.js';
 
 // === State ===
-let currentMember = '';
+const BETA_CODE = 'FAMILYMEALS2026';
 let members = [];
 let appInitialized = false;
 
@@ -62,7 +62,6 @@ async function initApp(household) {
 
   // Get members from household
   members = await getHouseholdMembers();
-  populateMemberPicker();
   setupNavigation();
   setupRecipesPage();
   setupPreferencesPage();
@@ -76,9 +75,17 @@ async function initApp(household) {
 
   // Show household name + invite code in header
   if (household) {
-    const nameEl = document.getElementById('user-display-name');
-    nameEl.textContent = `${household.name}`;
-    nameEl.title = `Invite code: ${household.inviteCode}`;
+    document.getElementById('user-display-name').textContent = household.name;
+    const inviteBtn = document.getElementById('invite-code-btn');
+    document.getElementById('invite-code-display').textContent = household.inviteCode;
+    inviteBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(household.inviteCode);
+        showToast(`Invite code "${household.inviteCode}" copied! Share it with your partner to join this household.`);
+      } catch {
+        showToast(`Invite code: ${household.inviteCode}`);
+      }
+    });
   }
 
   showPage('home');
@@ -112,6 +119,15 @@ function setupLoginPage() {
   document.getElementById('email-signup-btn').addEventListener('click', async () => {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
+    const betaCode = document.getElementById('beta-code').value.trim();
+    if (!betaCode) {
+      showLoginError('Please enter a beta access code to create an account.');
+      return;
+    }
+    if (betaCode.toUpperCase() !== BETA_CODE) {
+      showLoginError('Invalid beta access code.');
+      return;
+    }
     if (!email || !password) {
       showLoginError('Please enter email and password.');
       return;
@@ -153,7 +169,67 @@ function friendlyAuthError(code) {
 }
 
 // === Household Setup ===
+let starterPackData = null;
+
+async function ensureStarterPackData() {
+  if (starterPackData) return starterPackData;
+  try {
+    const resp = await fetch('data/starter-packs.json');
+    starterPackData = await resp.json();
+    return starterPackData;
+  } catch (e) {
+    console.warn('Could not load starter packs:', e);
+    return null;
+  }
+}
+
+function renderStarterPackOptions(container, existingRecipeUids) {
+  if (!starterPackData) {
+    container.innerHTML = '<p class="section-help">Could not load starter packs.</p>';
+    return;
+  }
+  container.innerHTML = starterPackData.packs.map(pack => {
+    const alreadyHave = pack.recipes.filter(r => existingRecipeUids.has(r.uid)).length;
+    const suffix = alreadyHave ? ` \u2014 ${alreadyHave} already added` : '';
+    return `
+      <label class="starter-pack-option">
+        <input type="checkbox" value="${pack.id}" ${alreadyHave === pack.recipes.length ? 'disabled' : 'checked'}>
+        <span class="starter-pack-info">
+          <span class="starter-pack-name">${pack.icon} ${pack.name}</span>
+          <span class="starter-pack-desc">${pack.description} (${pack.recipes.length} recipes${suffix})</span>
+        </span>
+      </label>
+    `;
+  }).join('');
+}
+
+function getSelectedStarterRecipes(containerSelector, existingRecipeUids) {
+  if (!starterPackData) return [];
+  const checked = document.querySelectorAll(`${containerSelector} input:checked`);
+  const selectedIds = new Set([...checked].map(cb => cb.value));
+  const recipes = [];
+  for (const pack of starterPackData.packs) {
+    if (selectedIds.has(pack.id)) {
+      for (const r of pack.recipes) {
+        if (existingRecipeUids && existingRecipeUids.has(r.uid)) continue;
+        recipes.push({
+          ...r,
+          rating: 0,
+          source_url: '',
+          notes: r.notes || '',
+          image_url: '',
+        });
+      }
+    }
+  }
+  return recipes;
+}
+
 function setupHouseholdPage() {
+  ensureStarterPackData().then(() => {
+    renderStarterPackOptions(document.getElementById('starter-pack-options'), new Set());
+  });
+
   document.getElementById('create-household-btn').addEventListener('click', async () => {
     const name = document.getElementById('household-name').value.trim();
     const membersStr = document.getElementById('household-members').value.trim();
@@ -170,7 +246,14 @@ function setupHouseholdPage() {
     }
     try {
       const { inviteCode } = await createHousehold(name, memberNames);
-      showToast(`Household created! Invite code: ${inviteCode}`);
+
+      // Import selected starter pack recipes
+      const starterRecipes = getSelectedStarterRecipes('#starter-pack-options', new Set());
+      if (starterRecipes.length) {
+        await bulkSaveRecipes(starterRecipes);
+      }
+
+      showToast(`Household created with ${starterRecipes.length} starter recipes! Invite code: ${inviteCode}`);
       const household = await getHouseholdInfo();
       const user = (await import('./firebase.js')).getCurrentUser();
       await showApp(user, household);
@@ -245,30 +328,6 @@ function showPage(pageId) {
   if (pageId === 'manage') refreshManageRecipeList();
 }
 
-// === Member Picker ===
-function populateMemberPicker() {
-  const select = document.getElementById('current-member');
-  select.innerHTML = '<option value="">Select...</option>';
-  for (const m of members) {
-    const opt = document.createElement('option');
-    opt.value = m;
-    opt.textContent = m;
-    select.appendChild(opt);
-  }
-  select.addEventListener('change', () => {
-    currentMember = select.value;
-    // Refresh current page to reflect member selection
-    if (document.getElementById('page-preferences').classList.contains('active')) {
-      refreshPreferences();
-    }
-    if (document.getElementById('page-recipes').classList.contains('active')) {
-      refreshRecipes();
-    }
-    if (document.getElementById('page-feedback').classList.contains('active')) {
-      refreshFeedback();
-    }
-  });
-}
 
 // === Home Page ===
 function setupHomePage() {
@@ -298,10 +357,8 @@ function refreshRecipes() {
     renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
     document.getElementById('recipe-modal').classList.remove('hidden');
   }, prefs, {
-    currentMember,
     onToggleFavorite: async (recipeUid) => {
-      if (!currentMember) return false;
-      return await toggleFavorite(recipeUid, currentMember);
+      return await toggleFavorite(recipeUid);
     }
   });
 }
@@ -318,7 +375,6 @@ function refreshPreferences() {
   renderPreferenceList(
     document.getElementById('pref-list'),
     getRecipes(),
-    currentMember,
     query,
     unratedOnly
   );
@@ -415,27 +471,11 @@ function setupPlanViewPage() {
     viewWeekOffset++;
     refreshPlanView();
   });
-  document.getElementById('add-comment-btn').addEventListener('click', async () => {
-    const text = document.getElementById('comment-text').value;
-    if (!currentMember) {
-      showToast('Please select your name first.');
-      return;
-    }
-    await handleAddComment(
-      getViewWeekKey(),
-      currentMember,
-      text,
-      document.getElementById('comments-list')
-    );
-    document.getElementById('comment-text').value = '';
-    showToast('Comment added!');
-  });
 }
 
 function refreshPlanView() {
   renderPlanView(
     document.getElementById('plan-view-grid'),
-    document.getElementById('comments-list'),
     document.getElementById('view-week-label'),
     getViewWeekKey(),
     getViewWeekLabel()
@@ -491,13 +531,67 @@ function refreshGrocery() {
 
 // === Feedback Page ===
 function refreshFeedback() {
-  renderFeedbackPage(document.getElementById('feedback-list'), currentMember);
+  renderFeedbackPage(document.getElementById('feedback-list'));
+}
+
+// === Starter Packs on Manage Page ===
+async function setupStarterPacksOnManage() {
+  await ensureStarterPackData();
+  const container = document.getElementById('manage-starter-packs');
+  const section = document.getElementById('starter-recipe-section');
+  if (!starterPackData) {
+    section.style.display = 'none';
+    return;
+  }
+
+  const existingUids = new Set(getRecipes().map(r => r.uid));
+  renderStarterPackOptions(container, existingUids);
+
+  // Check if all packs are fully added already
+  const allAdded = starterPackData.packs.every(pack =>
+    pack.recipes.every(r => existingUids.has(r.uid))
+  );
+  if (allAdded) {
+    section.querySelector('.section-help').textContent = 'All starter recipes have been added!';
+    document.getElementById('add-starter-btn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('add-starter-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('add-starter-btn');
+    const currentUids = new Set(getRecipes().map(r => r.uid));
+    const recipes = getSelectedStarterRecipes('#manage-starter-packs', currentUids);
+    if (!recipes.length) {
+      showToast('No new recipes to add \u2014 you already have the selected packs.');
+      return;
+    }
+    btn.textContent = 'Adding...';
+    btn.disabled = true;
+    try {
+      await bulkSaveRecipes(recipes);
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      showToast(`Added ${recipes.length} starter recipes!`);
+      refreshManageRecipeList();
+      // Re-render pack options to show updated state
+      const updatedUids = new Set(getRecipes().map(r => r.uid));
+      renderStarterPackOptions(container, updatedUids);
+    } catch (e) {
+      showToast('Failed to add recipes: ' + e.message);
+    } finally {
+      btn.textContent = 'Add Selected Recipes';
+      btn.disabled = false;
+    }
+  });
 }
 
 // === Manage Page ===
 let pendingImport = [];
 
 function setupManagePage() {
+  // Starter recipe packs
+  setupStarterPacksOnManage();
+
   // Single recipe add
   document.getElementById('save-recipe-btn').addEventListener('click', async () => {
     const name = document.getElementById('new-recipe-name').value.trim();

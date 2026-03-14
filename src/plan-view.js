@@ -1,10 +1,10 @@
-import { loadCommittedPlan, loadComments, addComment } from './firebase.js';
+import { loadCommittedPlan } from './firebase.js';
 import { getRecipeByUid } from './recipes.js';
-import { getWeekKey, getWeekLabel, getCurrentWeekStart } from './planner.js';
+import { getWeekKey, getWeekLabel } from './planner.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export async function renderPlanView(gridContainer, commentsListEl, weekLabelEl, weekKeyOverride, weekLabelOverride) {
+export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride, weekLabelOverride) {
   const weekKey = weekKeyOverride || getWeekKey();
   weekLabelEl.textContent = weekLabelOverride || getWeekLabel();
 
@@ -13,11 +13,9 @@ export async function renderPlanView(gridContainer, commentsListEl, weekLabelEl,
 
   if (!plan || !plan.days) {
     gridContainer.innerHTML = '<p style="color:var(--text-light);padding:2rem;">No committed plan for this week. Go to "Plan Week", set it up, and hit "Commit This Plan".</p>';
-    commentsListEl.innerHTML = '';
     return;
   }
 
-  // Derive Monday from the weekKey
   const monday = new Date(weekKey + 'T00:00:00');
 
   for (let i = 0; i < 7; i++) {
@@ -27,15 +25,13 @@ export async function renderPlanView(gridContainer, commentsListEl, weekLabelEl,
     const dayData = plan.days[dayName] || {};
 
     const card = document.createElement('div');
-    card.className = `plan-day-card${dayData.skip || dayData.leftover ? ' skip' : ''}`;
+    card.className = `plan-day-card${dayData.skip ? ' skip' : ''}`;
 
     const recipe = dayData.recipeUid ? getRecipeByUid(dayData.recipeUid) : null;
     const mealName = dayData.skip ? 'Skipped'
-      : dayData.leftover ? 'Leftover/Choice'
       : (recipe ? recipe.name : 'No meal planned');
 
     const flags = [];
-    if (dayData.dadCooks) flags.push('Dad cooks');
     if (dayData.makeAhead) flags.push('Make ahead');
 
     const sides = dayData.sides ? `<span class="meal-sides">+ ${escHtml(dayData.sides)}</span>` : '';
@@ -49,38 +45,6 @@ export async function renderPlanView(gridContainer, commentsListEl, weekLabelEl,
     `;
     gridContainer.appendChild(card);
   }
-
-  // Load comments
-  await renderComments(weekKey, commentsListEl);
-}
-
-async function renderComments(weekKey, container) {
-  const comments = await loadComments(weekKey);
-  container.innerHTML = '';
-
-  if (!comments.length) {
-    container.innerHTML = '<p style="color:var(--text-light);">No comments yet.</p>';
-    return;
-  }
-
-  for (const c of comments) {
-    const el = document.createElement('div');
-    el.className = 'comment';
-    el.innerHTML = `
-      <div class="comment-header">
-        <strong>${escHtml(c.memberName)}</strong>
-        <span>${new Date(c.timestamp).toLocaleString()}</span>
-      </div>
-      <div class="comment-body">${escHtml(c.text)}</div>
-    `;
-    container.appendChild(el);
-  }
-}
-
-export async function handleAddComment(weekKey, memberName, text, commentsListEl) {
-  if (!memberName || !text.trim()) return;
-  await addComment(weekKey, memberName, text.trim());
-  await renderComments(weekKey, commentsListEl);
 }
 
 function escHtml(str) {
