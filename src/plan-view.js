@@ -38,14 +38,19 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
 
     card.innerHTML = `
       <span class="day-name">${dayName}</span>
-      <span class="meal-name">${recipe && onMealClick ? `<span class="meal-link" style="cursor:pointer;color:var(--primary);text-decoration:none;" onmouseenter="this.style.textDecoration='underline'" onmouseleave="this.style.textDecoration='none'">${escHtml(mealName)}</span>` : escHtml(mealName)}${sides}</span>
+      <span class="meal-name">${escHtml(mealName)}${sides}</span>
       <div class="meal-flags">
         ${flags.map(f => `<span class="flag-chip">${f}</span>`).join('')}
       </div>
     `;
 
     if (recipe && onMealClick) {
-      card.querySelector('.meal-link').addEventListener('click', () => onMealClick(recipe));
+      const nameEl = card.querySelector('.meal-name');
+      nameEl.style.cursor = 'pointer';
+      nameEl.style.color = 'var(--primary)';
+      nameEl.addEventListener('mouseenter', () => nameEl.style.textDecoration = 'underline');
+      nameEl.addEventListener('mouseleave', () => nameEl.style.textDecoration = 'none');
+      nameEl.addEventListener('click', () => onMealClick(recipe));
     }
 
     gridContainer.appendChild(card);
