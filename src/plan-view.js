@@ -50,7 +50,10 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
       nameEl.style.color = 'var(--primary)';
       nameEl.addEventListener('mouseenter', () => nameEl.style.textDecoration = 'underline');
       nameEl.addEventListener('mouseleave', () => nameEl.style.textDecoration = 'none');
-      nameEl.addEventListener('click', () => onMealClick(recipe));
+      nameEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onMealClick(recipe);
+      });
     }
 
     gridContainer.appendChild(card);
