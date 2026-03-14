@@ -1,11 +1,11 @@
-// Firebase configuration — create a Firebase project and paste your config here
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDVrgB99bUYlUfQzkI16bk335XLh_D00do",
+  authDomain: "mealplanapp-ad277.firebaseapp.com",
+  projectId: "mealplanapp-ad277",
+  storageBucket: "mealplanapp-ad277.firebasestorage.app",
+  messagingSenderId: "631553776828",
+  appId: "1:631553776828:web:17d331913db00eba3c44b9"
 };
 
 let db = null;
@@ -377,25 +377,35 @@ export async function loadHouseholdRecipes() {
   });
 }
 
-// === Experiment Evaluations ===
+// === Weekly Feedback ===
 
-export async function saveExperimentEval(uid, result, ingredients, directions) {
-  const data = { uid, result, ingredients: ingredients || '', directions: directions || '', evaluated: Date.now() };
+export async function saveFeedbackVote(weekKey, recipeUid, memberName, vote) {
+  const docId = `${weekKey}_${recipeUid}_${memberName}`;
+  const data = { weekKey, recipeUid, memberName, vote, timestamp: Date.now() };
   if (!firebaseEnabled) {
-    const evals = JSON.parse(localStorage.getItem("experiment_evals") || "{}");
-    evals[uid] = data;
-    localStorage.setItem("experiment_evals", JSON.stringify(evals));
+    const feedback = JSON.parse(localStorage.getItem("feedback_votes") || "{}");
+    feedback[docId] = data;
+    localStorage.setItem("feedback_votes", JSON.stringify(feedback));
     return;
   }
-  await col("experimentEvals").doc(uid).set(data);
+  await col("feedback").doc(docId).set(data);
 }
 
-export async function loadExperimentEvals() {
+export async function loadFeedbackForWeek(weekKey) {
   if (!firebaseEnabled) {
-    return JSON.parse(localStorage.getItem("experiment_evals") || "{}");
+    const all = JSON.parse(localStorage.getItem("feedback_votes") || "{}");
+    const votes = {};
+    for (const [id, data] of Object.entries(all)) {
+      if (data.weekKey === weekKey) {
+        votes[id] = data;
+      }
+    }
+    return votes;
   }
-  const snapshot = await col("experimentEvals").get();
-  const evals = {};
-  snapshot.forEach(doc => { evals[doc.id] = doc.data(); });
-  return evals;
+  const snapshot = await col("feedback")
+    .where("weekKey", "==", weekKey)
+    .get();
+  const votes = {};
+  snapshot.forEach(doc => { votes[doc.id] = doc.data(); });
+  return votes;
 }

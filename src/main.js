@@ -5,7 +5,7 @@ import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey } f
 import { renderPlanView, handleAddComment } from './plan-view.js';
 import { renderGroceryList, getGroceryText } from './grocery.js';
 import { sendPlanEmail, isEmailConfigured } from './email.js';
-import { renderExperimentsPage } from './experiments.js';
+import { renderFeedbackPage } from './feedback.js';
 
 // === State ===
 let currentMember = '';
@@ -241,7 +241,7 @@ function showPage(pageId) {
   if (pageId === 'planner') refreshPlanner();
   if (pageId === 'plan-view') refreshPlanView();
   if (pageId === 'grocery') refreshGrocery();
-  if (pageId === 'experiments') refreshExperiments();
+  if (pageId === 'feedback') refreshFeedback();
   if (pageId === 'manage') refreshManageRecipeList();
 }
 
@@ -263,6 +263,9 @@ function populateMemberPicker() {
     }
     if (document.getElementById('page-recipes').classList.contains('active')) {
       refreshRecipes();
+    }
+    if (document.getElementById('page-feedback').classList.contains('active')) {
+      refreshFeedback();
     }
   });
 }
@@ -486,9 +489,9 @@ function refreshGrocery() {
   );
 }
 
-// === Experiments Page ===
-function refreshExperiments() {
-  renderExperimentsPage(document.getElementById('experiments-list'));
+// === Feedback Page ===
+function refreshFeedback() {
+  renderFeedbackPage(document.getElementById('feedback-list'), currentMember);
 }
 
 // === Manage Page ===
@@ -599,6 +602,125 @@ function setupManagePage() {
     document.getElementById('import-preview').classList.add('hidden');
     document.getElementById('import-file').value = '';
     document.getElementById('import-file-name').textContent = 'No file chosen';
+  });
+
+  // URL import
+  setupUrlImport();
+}
+
+// === URL Import ===
+
+let pendingUrlRecipe = null;
+
+function setupUrlImport() {
+  const input = document.getElementById('url-import-input');
+  const fetchBtn = document.getElementById('url-import-btn');
+  const preview = document.getElementById('url-import-preview');
+  const result = document.getElementById('url-import-result');
+  const errorEl = document.getElementById('url-import-error');
+
+  // Allow Enter key to submit
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') fetchBtn.click();
+  });
+
+  fetchBtn.addEventListener('click', async () => {
+    const url = input.value.trim();
+    if (!url) {
+      showToast('Please enter a URL.');
+      return;
+    }
+
+    errorEl.classList.add('hidden');
+    preview.classList.add('hidden');
+    fetchBtn.textContent = 'Fetching...';
+    fetchBtn.disabled = true;
+
+    try {
+      const scrapeRecipe = firebase.functions().httpsCallable('scrapeRecipe');
+      const response = await scrapeRecipe({ url });
+      const recipe = response.data;
+
+      if (!recipe || !recipe.name) {
+        throw new Error('No recipe found on that page.');
+      }
+
+      // If partial, pre-fill the manual form instead
+      if (recipe.partial) {
+        document.getElementById('new-recipe-name').value = recipe.name || '';
+        document.getElementById('new-recipe-source').value = url;
+        document.getElementById('new-recipe-ingredients').value = recipe.ingredients || '';
+        document.getElementById('new-recipe-directions').value = recipe.directions || '';
+        document.getElementById('new-recipe-notes').value = recipe.notes || '';
+        input.value = '';
+        showToast('Couldn\'t extract full recipe data — form pre-filled with what we found. Add the details manually.');
+        // Scroll to the form
+        document.getElementById('add-recipe-form').scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+
+      pendingUrlRecipe = {
+        uid: 'url_' + Date.now(),
+        name: recipe.name || '',
+        ingredients: recipe.ingredients || '',
+        directions: recipe.directions || '',
+        description: recipe.description || '',
+        servings: recipe.servings || '',
+        prep_time: recipe.prep_time || '',
+        cook_time: recipe.cook_time || '',
+        total_time: recipe.total_time || '',
+        categories: recipe.categories || [],
+        source: recipe.source || '',
+        source_url: recipe.source_url || url,
+        notes: recipe.notes || '',
+        image_url: recipe.image_url || '',
+        rating: 0,
+      };
+
+      // Show preview
+      result.innerHTML = `
+        <div class="url-recipe-preview">
+          <h4>${escManage(recipe.name)}</h4>
+          ${recipe.description ? `<p class="preview-field">${escManage(recipe.description)}</p>` : ''}
+          <div class="preview-field">
+            <strong>Source:</strong> ${escManage(recipe.source || '')}
+            ${recipe.prep_time ? ` &middot; Prep: ${escManage(recipe.prep_time)}` : ''}
+            ${recipe.cook_time ? ` &middot; Cook: ${escManage(recipe.cook_time)}` : ''}
+            ${recipe.servings ? ` &middot; Serves: ${escManage(recipe.servings)}` : ''}
+          </div>
+          ${recipe.ingredients ? `<div class="preview-field"><strong>Ingredients</strong><div class="preview-content">${escManage(recipe.ingredients)}</div></div>` : ''}
+          ${recipe.directions ? `<div class="preview-field"><strong>Directions</strong><div class="preview-content">${escManage(recipe.directions)}</div></div>` : ''}
+        </div>
+      `;
+      preview.classList.remove('hidden');
+    } catch (err) {
+      const msg = err.message || 'Failed to fetch recipe.';
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    } finally {
+      fetchBtn.textContent = 'Fetch Recipe';
+      fetchBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('url-import-save-btn').addEventListener('click', async () => {
+    if (!pendingUrlRecipe) return;
+
+    await saveRecipeToFirebase(pendingUrlRecipe);
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    refreshManageRecipeList();
+    showToast(`"${pendingUrlRecipe.name}" saved!`);
+
+    // Reset
+    pendingUrlRecipe = null;
+    input.value = '';
+    preview.classList.add('hidden');
+  });
+
+  document.getElementById('url-import-cancel-btn').addEventListener('click', () => {
+    pendingUrlRecipe = null;
+    document.getElementById('url-import-preview').classList.add('hidden');
   });
 }
 

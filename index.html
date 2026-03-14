@@ -8,6 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 </head>
 <body>
   <!-- Login Screen -->
@@ -67,7 +68,7 @@
       <span class="nav-sep"></span>
       <button class="nav-btn" data-page="planner">Plan Week</button>
       <button class="nav-btn" data-page="grocery">Ingredients</button>
-      <button class="nav-btn" data-page="experiments">Experiments</button>
+      <button class="nav-btn" data-page="feedback">Feedback</button>
       <button class="nav-btn" data-page="manage">Manage</button>
     </nav>
     <div id="user-info">
@@ -112,9 +113,9 @@
           <span class="home-card-icon">&#128722;</span>
           <span class="home-card-title">Meal Plan &amp; Ingredients</span>
         </button>
-        <button class="home-card small" data-page="experiments">
-          <span class="home-card-icon">&#129514;</span>
-          <span class="home-card-title">Experiments</span>
+        <button class="home-card small" data-page="feedback">
+          <span class="home-card-icon">&#128172;</span>
+          <span class="home-card-title">Feedback</span>
         </button>
         <button class="home-card small" data-page="manage">
           <span class="home-card-icon">&#9998;</span>
@@ -207,18 +208,36 @@
       <button id="email-plan-btn" class="btn primary">Email Plan + Grocery List</button>
     </section>
 
-    <!-- Experiments Page -->
-    <section id="page-experiments" class="page hidden">
+    <!-- Feedback Page -->
+    <section id="page-feedback" class="page hidden">
       <div class="page-header">
-        <h2>Experiments</h2>
+        <h2>Weekly Feedback</h2>
       </div>
-      <p class="planner-instructions">Recipes we haven't tried yet. The planner suggests one experiment per week on weekends. After trying one, rate it here — successes join the regular rotation, failures get removed.</p>
-      <div id="experiments-list"></div>
+      <p class="planner-instructions">Review last week's meals. Vote on each one to help the planner learn your family's preferences.</p>
+      <div id="feedback-list"></div>
     </section>
 
     <!-- Manage Recipes Page -->
     <section id="page-manage" class="page hidden">
       <h2>Manage Recipes</h2>
+
+      <!-- Import from URL -->
+      <div id="url-import-section" class="manage-section">
+        <h3>Add from URL</h3>
+        <p class="section-help">Paste a link to a recipe page. Works with most recipe blogs and sites.</p>
+        <div class="url-import-controls">
+          <input type="text" id="url-import-input" placeholder="https://www.example.com/recipe/...">
+          <button id="url-import-btn" class="btn primary">Fetch Recipe</button>
+        </div>
+        <div id="url-import-preview" class="hidden">
+          <div id="url-import-result"></div>
+          <div class="import-actions">
+            <button id="url-import-save-btn" class="btn primary">Save This Recipe</button>
+            <button id="url-import-cancel-btn" class="btn">Cancel</button>
+          </div>
+        </div>
+        <div id="url-import-error" class="hidden"></div>
+      </div>
 
       <!-- Import Recipes -->
       <div id="import-recipe-section" class="manage-section">

@@ -1,14 +1,6 @@
 import { getArchivedRecipes, getCustomRecipes } from './firebase.js';
 
 let allRecipes = [];
-let experimentRecipes = [];
-
-const EXPERIMENT_PREFIXES = ['KA ', 'CC ', 'SKC ', 'SKK ', 'SKE '];
-
-export function isExperiment(recipe) {
-  return EXPERIMENT_PREFIXES.some(p => recipe.name.startsWith(p)) &&
-    !recipe.ingredients && !recipe.directions;
-}
 
 export async function loadRecipes() {
   // All recipes come from the household's Firestore collection
@@ -18,12 +10,8 @@ export async function loadRecipes() {
   const archived = new Set(getArchivedRecipes());
   all = all.filter(r => !archived.has(r.uid));
 
-  // Separate experiments from regular recipes
-  experimentRecipes = all.filter(r => isExperiment(r));
-  allRecipes = all.filter(r => !isExperiment(r));
-
+  allRecipes = all;
   allRecipes.sort((a, b) => a.name.localeCompare(b.name));
-  experimentRecipes.sort((a, b) => a.name.localeCompare(b.name));
   return allRecipes;
 }
 
@@ -31,12 +19,8 @@ export function getRecipes() {
   return allRecipes;
 }
 
-export function getExperiments() {
-  return experimentRecipes;
-}
-
 export function getRecipeByUid(uid) {
-  return allRecipes.find(r => r.uid === uid) || experimentRecipes.find(r => r.uid === uid);
+  return allRecipes.find(r => r.uid === uid);
 }
 
 export function renderRecipeList(container, recipes, onClick, preferences, { currentMember, onToggleFavorite } = {}) {
