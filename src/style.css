@@ -115,6 +115,14 @@ body {
   line-height: 1.4;
 }
 .login-error.hidden { display: none; }
+.login-guide-link {
+  display: block;
+  margin-top: 1.25rem;
+  color: var(--primary);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.login-guide-link:hover { text-decoration: underline; }
 
 /* === Household Setup === */
 #household-setup {
@@ -350,6 +358,19 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 }
 .home-card.small .home-card-title {
   font-size: 0.9rem;
+}
+.home-guide-link {
+  max-width: 800px;
+  margin: 0 auto 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.home-guide-link a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.home-guide-link a:hover {
+  text-decoration: underline;
 }
 
 /* === Recipe Grid === */

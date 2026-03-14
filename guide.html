@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Meals - How It Works</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f5f3f0;
+      --card: #ffffff;
+      --primary: #2d6a4f;
+      --primary-dark: #1b4332;
+      --text: #2b2d42;
+      --text-light: #6c757d;
+      --border: #dee2e6;
+      --radius: 8px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+    header {
+      background: var(--primary-dark);
+      color: white;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+    header h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+    header p { opacity: 0.85; font-size: 1.05rem; }
+    .back-link {
+      display: inline-block;
+      margin-top: 0.75rem;
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .back-link:hover { color: white; }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    h2 {
+      color: var(--primary-dark);
+      font-size: 1.4rem;
+      margin: 2.5rem 0 0.75rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 2px solid var(--border);
+    }
+    h2:first-child { margin-top: 0; }
+    h3 {
+      color: var(--primary);
+      font-size: 1.1rem;
+      margin: 1.5rem 0 0.5rem;
+    }
+    p { margin-bottom: 0.75rem; }
+    ol, ul {
+      margin: 0.5rem 0 1rem 1.5rem;
+    }
+    li { margin-bottom: 0.4rem; }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin: 1rem 0;
+    }
+    .card h3 { margin-top: 0; }
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .step-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .step-card .step-icon {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+    .step-card .step-title {
+      font-weight: 700;
+      color: var(--primary-dark);
+      display: block;
+      margin-bottom: 0.35rem;
+    }
+    .step-card .step-desc {
+      font-size: 0.85rem;
+      color: var(--text-light);
+    }
+    .highlight {
+      background: #e8f5e9;
+      border-left: 4px solid var(--primary);
+      padding: 0.75rem 1rem;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    code {
+      background: var(--bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+    .faq dt {
+      font-weight: 600;
+      margin-top: 1rem;
+      color: var(--primary-dark);
+    }
+    .faq dd {
+      margin: 0.25rem 0 0 0;
+      color: var(--text);
+    }
+    @media (max-width: 600px) {
+      .step-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Family Meals</h1>
+    <p>Plan meals, rate recipes, and coordinate dinner as a family.</p>
+    <a href="index.html" class="back-link">&larr; Back to app</a>
+  </header>
+
+  <div class="container">
+    <h2>How It Works</h2>
+    <p>Family Meals helps your household plan weekly dinners together. Everyone in the family can mark what they do and don't eat, favorite the meals they love, and see what's for dinner each night.</p>
+
+    <div class="step-grid">
+      <div class="step-card">
+        <span class="step-icon">&#128214;</span>
+        <span class="step-title">1. Add Recipes</span>
+        <span class="step-desc">Start with our curated packs, import from a file, paste a URL, or add your own.</span>
+      </div>
+      <div class="step-card">
+        <span class="step-icon">&#11088;</span>
+        <span class="step-title">2. Set Preferences</span>
+        <span class="step-desc">Mark who doesn't eat what, flag favorites, and note which meals work as make-ahead.</span>
+      </div>
+      <div class="step-card">
+        <span class="step-icon">&#129668;</span>
+        <span class="step-title">3. Plan the Week</span>
+        <span class="step-desc">Set who's home each night, then let the system suggest a varied menu.</span>
+      </div>
+      <div class="step-card">
+        <span class="step-icon">&#128197;</span>
+        <span class="step-title">4. Cook & Eat!</span>
+        <span class="step-desc">Everyone can see the week's plan and check ingredients for each meal.</span>
+      </div>
+    </div>
+
+    <h2>Getting Started</h2>
+
+    <h3>Create Your Account</h3>
+    <ol>
+      <li>Go to the app and click <strong>Create Account</strong>.</li>
+      <li>Enter your email, a password, and your <strong>beta access code</strong>.</li>
+      <li>You'll be prompted to create a <strong>household</strong> &mdash; give it a name (e.g., "The Johnsons") and list your family members by first name.</li>
+      <li>Optionally pick from <strong>starter recipe packs</strong> to pre-load your household with 30 recipes.</li>
+    </ol>
+
+    <h3>Invite Your Partner</h3>
+    <p>Your household has an <strong>invite code</strong> &mdash; you'll see it in the top-right corner of the app. Click it to copy, then share it with your partner. They create their own account and enter the invite code on the household setup screen to join. You'll both see the same recipes, plans, and preferences.</p>
+
+    <div class="highlight">
+      Each person logs in with their own email, but everyone in the household shares the same recipes and meal plans.
+    </div>
+
+    <h2>Features</h2>
+
+    <div class="card">
+      <h3>&#128214; Browse Recipes</h3>
+      <p>Search and browse all your household's recipes. Click any recipe to see full details including ingredients, directions, and prep times. Favorites are marked with a heart.</p>
+    </div>
+
+    <div class="card">
+      <h3>&#11088; Rate Recipes</h3>
+      <p>This is where your family sets preferences for each recipe:</p>
+      <ul>
+        <li><strong>Doesn't eat</strong> &mdash; Tap a family member's name to mark that they won't eat this dish. The planner will automatically skip it on nights they're home.</li>
+        <li><strong>Favorite</strong> &mdash; Flag meals your family loves. Favorites get a boost when the planner suggests meals.</li>
+        <li><strong>Make-ahead</strong> &mdash; Mark recipes that can be prepped in advance. When you mark a day as "make ahead" in the planner, it will only suggest these recipes.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>&#129668; Plan the Week</h3>
+      <p>The weekly planner lets you set up each day:</p>
+      <ol>
+        <li><strong>Set who's home</strong> &mdash; Check the family members who'll be eating that night.</li>
+        <li><strong>Mark special days</strong> &mdash; Flag days as "skip" (eating out, leftovers) or "make ahead."</li>
+        <li><strong>Suggest Meals</strong> &mdash; Hit the button and the system picks a balanced menu. It avoids repeating proteins, skips meals that someone at the table doesn't eat, and favors your favorites. You can also pick meals manually from the dropdown.</li>
+        <li><strong>Add sides</strong> &mdash; Optionally note side dishes for each meal.</li>
+        <li><strong>Commit</strong> &mdash; When you're happy, hit "Commit This Plan" to publish it for the household.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>&#128197; This Week's Plan</h3>
+      <p>A clean view of the committed meal plan for the current week (and past/future weeks). Everyone in the household sees the same plan.</p>
+    </div>
+
+    <div class="card">
+      <h3>&#128722; Meal Plan & Ingredients</h3>
+      <p>Shows each day's meal with its full ingredient list. Use this while grocery shopping or to prep for the week. You can copy the full list to your clipboard or email it.</p>
+    </div>
+
+    <div class="card">
+      <h3>&#128172; Feedback</h3>
+      <p>After meals are cooked, come here to give quick feedback. You can mark "doesn't eat" for family members, favorite a meal, or remove a recipe entirely if it didn't work out. Shows both the current and previous week.</p>
+    </div>
+
+    <div class="card">
+      <h3>&#9998; Manage Recipes</h3>
+      <p>Add recipes to your household in several ways:</p>
+      <ul>
+        <li><strong>Starter packs</strong> &mdash; Curated collections of family-friendly recipes to get you going.</li>
+        <li><strong>From a URL</strong> &mdash; Paste a link to a recipe blog or site, and the system will try to pull in the recipe automatically.</li>
+        <li><strong>Import a file</strong> &mdash; Upload a JSON or CSV file to bulk-import recipes.</li>
+        <li><strong>Add manually</strong> &mdash; Fill in the form with a name, ingredients, directions, and other details.</li>
+      </ul>
+    </div>
+
+    <h2>How the Meal Suggester Works</h2>
+    <p>When you hit "Suggest Meals," the system scores every eligible recipe for each day. Here's what it considers:</p>
+    <ul>
+      <li><strong>Who's home</strong> &mdash; Recipes are excluded if anyone at the table has it marked as "doesn't eat."</li>
+      <li><strong>Make-ahead days</strong> &mdash; Only make-ahead-flagged recipes are suggested for these days.</li>
+      <li><strong>Protein variety</strong> &mdash; The system tracks proteins (chicken, beef, pork, seafood, pasta, etc.) used so far in the week and penalizes repeats.</li>
+      <li><strong>Recent history</strong> &mdash; Meals served in the last few weeks get a penalty to keep things fresh.</li>
+      <li><strong>Favorites</strong> &mdash; Favorited recipes get a score boost.</li>
+    </ul>
+    <p>The result is a varied, balanced menu that respects your family's preferences without you having to think about it.</p>
+
+    <h2>FAQ</h2>
+    <dl class="faq">
+      <dt>Can multiple people plan the week?</dt>
+      <dd>Yes! Anyone in the household can edit the plan. The last person to "Commit" publishes the plan for everyone.</dd>
+
+      <dt>What if I want to change a meal after committing?</dt>
+      <dd>Just go back to "Plan the Week," make your changes, and commit again. The new plan replaces the old one.</dd>
+
+      <dt>Can I see past weeks?</dt>
+      <dd>Yes &mdash; the "This Week's Plan," "Plan the Week," and "Ingredients" pages all have previous/next week navigation.</dd>
+
+      <dt>How do I remove a recipe we don't like?</dt>
+      <dd>You can delete it from the Feedback page (click the remove button) or from the Manage page. Deleted recipes won't appear in future suggestions.</dd>
+
+      <dt>Is my data shared with other households?</dt>
+      <dd>No. Each household's recipes, preferences, and meal plans are completely private.</dd>
+
+      <dt>How do I invite more family members?</dt>
+      <dd>Click the invite code in the top-right corner of the app to copy it. Share it with anyone you'd like to join your household &mdash; they'll need to create an account and enter the code.</dd>
+    </dl>
+  </div>
+</body>
+</html>
