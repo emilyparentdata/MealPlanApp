@@ -749,8 +749,123 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .plan-day-card.skip { opacity: 0.5; }
 
 /* === Grocery === */
-#grocery-list {
+
+/* Aggregated checklist */
+#grocery-checklist {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
   margin-bottom: 1rem;
+}
+.grocery-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.progress-text {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.grocery-category {
+  margin-bottom: 1rem;
+}
+.grocery-category:last-child {
+  margin-bottom: 0;
+}
+.grocery-category-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--primary);
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.grocery-checklist-items {
+  list-style: none;
+  padding: 0;
+}
+.grocery-checklist-items li {
+  padding: 0.15rem 0;
+}
+.grocery-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.35rem 0.25rem;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.grocery-check:hover {
+  background: var(--bg);
+}
+.grocery-check input[type="checkbox"] {
+  margin-top: 0.15rem;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.grocery-item-text {
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.grocery-meal-note {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.grocery-check.checked .grocery-item-text {
+  text-decoration: line-through;
+  color: var(--text-light);
+}
+.grocery-check.checked .grocery-meal-note {
+  text-decoration: line-through;
+}
+
+/* Action buttons */
+.grocery-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* Meal-by-meal breakdown (collapsed by default) */
+.meal-breakdown {
+  margin-bottom: 2rem;
+}
+.meal-breakdown summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 0;
+  user-select: none;
+}
+.meal-breakdown summary:hover {
+  color: var(--primary-dark);
+}
+#grocery-list {
+  margin-top: 0.75rem;
 }
 .grocery-day {
   background: var(--card);
@@ -793,23 +908,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   color: var(--text-light);
   font-style: italic;
   font-size: 0.85rem;
-}
-.grocery-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-.grocery-check input[type="checkbox"] {
-  margin-top: 0.2rem;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-.grocery-check.checked span {
-  text-decoration: line-through;
-  color: var(--text-light);
 }
 
 /* === Manage === */
@@ -1221,7 +1319,32 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     min-width: auto;
   }
 
-  /* -- Grocery list: larger items for touch scanning -- */
+  /* -- Grocery checklist: touch-friendly -- */
+  #grocery-checklist {
+    padding: 0.75rem;
+  }
+  .grocery-check {
+    padding: 0.5rem 0.25rem;
+  }
+  .grocery-check input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+  .grocery-item-text {
+    font-size: 1rem;
+  }
+  .grocery-meal-note {
+    display: none;  /* hide meal notes on mobile to save space */
+  }
+  .grocery-actions {
+    flex-direction: column;
+  }
+  .grocery-actions .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* -- Grocery breakdown: larger items for touch scanning -- */
   .grocery-ingredients { columns: 1; }
   .grocery-ingredients li {
     padding: 0.45rem 0;

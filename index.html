@@ -73,7 +73,7 @@
       <button class="nav-btn primary-nav" data-page="plan-view">This Week</button>
       <span class="nav-sep"></span>
       <button class="nav-btn" data-page="planner">Plan Week</button>
-      <button class="nav-btn" data-page="grocery">Ingredients</button>
+      <button class="nav-btn" data-page="grocery">Grocery List</button>
       <button class="nav-btn" data-page="feedback">Feedback</button>
       <button class="nav-btn" data-page="manage">Manage</button>
     </nav>
@@ -113,7 +113,7 @@
         </button>
         <button class="home-card small" data-page="grocery">
           <span class="home-card-icon">&#128722;</span>
-          <span class="home-card-title">Meal Plan &amp; Ingredients</span>
+          <span class="home-card-title">Grocery List</span>
         </button>
         <button class="home-card small" data-page="feedback">
           <span class="home-card-icon">&#128172;</span>
@@ -190,16 +190,23 @@
     <!-- Grocery List Page -->
     <section id="page-grocery" class="page hidden">
       <div class="page-header">
-        <h2>Meal Plan &amp; Ingredients</h2>
+        <h2>Grocery List</h2>
         <div class="week-selector">
           <button id="grocery-prev-week">&laquo; Prev</button>
           <span id="grocery-week-label"></span>
           <button id="grocery-next-week">Next &raquo;</button>
         </div>
       </div>
-      <div id="grocery-list"></div>
-      <button id="copy-grocery-btn" class="btn">Copy to Clipboard</button>
-      <button id="email-plan-btn" class="btn primary">Email Plan + Grocery List</button>
+      <div id="grocery-checklist"></div>
+      <div class="grocery-actions">
+        <button id="share-grocery-btn" class="btn primary">Share List</button>
+        <button id="copy-grocery-btn" class="btn">Copy to Clipboard</button>
+        <button id="clear-checked-btn" class="btn">Uncheck All</button>
+      </div>
+      <details class="meal-breakdown">
+        <summary>Meal-by-meal breakdown</summary>
+        <div id="grocery-list"></div>
+      </details>
     </section>
 
     <!-- Feedback Page -->

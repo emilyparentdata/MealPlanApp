@@ -3,8 +3,7 @@ import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRe
 import { initPreferences, renderPreferenceList, getAllPreferences, toggleFavorite } from './preferences.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey } from './planner.js';
 import { renderPlanView } from './plan-view.js';
-import { renderGroceryList, getGroceryText } from './grocery.js';
-import { sendPlanEmail, isEmailConfigured } from './email.js';
+import { renderGroceryList, getGroceryText, clearChecked } from './grocery.js';
 import { renderFeedbackPage } from './feedback.js';
 
 // === State ===
@@ -512,18 +511,36 @@ function setupGroceryPage() {
     }
   });
 
-  document.getElementById('email-plan-btn').addEventListener('click', async () => {
+  document.getElementById('share-grocery-btn').addEventListener('click', async () => {
     if (groceryLoading) await groceryLoading;
-    try {
-      const result = await sendPlanEmail();
-      if (result.fallback) {
-        showToast('Plan + grocery list copied to clipboard!');
-      } else {
-        showToast('Email sent!');
-      }
-    } catch (e) {
-      showToast(e.message || 'Failed to send email.');
+    const text = getGroceryText();
+    if (!text) {
+      showToast('Nothing to share — no meals planned this week.');
+      return;
     }
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Grocery List', text });
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          showToast('Could not share.');
+        }
+      }
+    } else {
+      // Fallback to clipboard on desktop
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Grocery list copied to clipboard!');
+      } catch {
+        showToast('Could not share — try the Copy button.');
+      }
+    }
+  });
+
+  document.getElementById('clear-checked-btn').addEventListener('click', () => {
+    clearChecked();
+    refreshGrocery();
+    showToast('All items unchecked.');
   });
 }
 
@@ -531,6 +548,7 @@ let groceryLoading = null;
 function refreshGrocery() {
   document.getElementById('grocery-week-label').textContent = getWeekLabel();
   groceryLoading = renderGroceryList(
+    document.getElementById('grocery-checklist'),
     document.getElementById('grocery-list'),
     document.getElementById('grocery-week-label')
   );
