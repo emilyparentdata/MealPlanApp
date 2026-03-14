@@ -4,7 +4,7 @@ import { getWeekKey, getWeekLabel } from './planner.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride, weekLabelOverride) {
+export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride, weekLabelOverride, onMealClick) {
   const weekKey = weekKeyOverride || getWeekKey();
   weekLabelEl.textContent = weekLabelOverride || getWeekLabel();
 
@@ -38,11 +38,16 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
 
     card.innerHTML = `
       <span class="day-name">${dayName}</span>
-      <span class="meal-name">${escHtml(mealName)}${sides}</span>
+      <span class="meal-name">${recipe && onMealClick ? `<span class="meal-link" style="cursor:pointer;color:var(--primary);text-decoration:none;" onmouseenter="this.style.textDecoration='underline'" onmouseleave="this.style.textDecoration='none'">${escHtml(mealName)}</span>` : escHtml(mealName)}${sides}</span>
       <div class="meal-flags">
         ${flags.map(f => `<span class="flag-chip">${f}</span>`).join('')}
       </div>
     `;
+
+    if (recipe && onMealClick) {
+      card.querySelector('.meal-link').addEventListener('click', () => onMealClick(recipe));
+    }
+
     gridContainer.appendChild(card);
   }
 }

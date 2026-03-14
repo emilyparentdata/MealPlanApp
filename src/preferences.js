@@ -94,6 +94,7 @@ export function renderPreferenceList(container, recipes, searchQuery, showUnrate
       btn.addEventListener('click', async () => {
         await toggleDoesntEat(r.uid, btn.dataset.member);
         btn.classList.toggle('active');
+        showToast('Saved');
       });
     });
 
@@ -101,16 +102,27 @@ export function renderPreferenceList(container, recipes, searchQuery, showUnrate
     row.querySelector('[data-action="makeAhead"]').addEventListener('click', async (e) => {
       await toggleMakeAhead(r.uid);
       e.target.classList.toggle('active');
+      showToast('Saved');
     });
 
     // Favorite toggle
     row.querySelector('[data-action="favorite"]').addEventListener('click', async (e) => {
       await toggleFavorite(r.uid);
       e.target.classList.toggle('active');
+      showToast('Saved');
     });
 
     container.appendChild(row);
   }
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.classList.remove('hidden');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
 function escHtml(str) {

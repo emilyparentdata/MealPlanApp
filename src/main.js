@@ -478,7 +478,11 @@ function refreshPlanView() {
     document.getElementById('plan-view-grid'),
     document.getElementById('view-week-label'),
     getViewWeekKey(),
-    getViewWeekLabel()
+    getViewWeekLabel(),
+    (recipe) => {
+      renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
+      document.getElementById('recipe-modal').classList.remove('hidden');
+    }
   );
 }
 

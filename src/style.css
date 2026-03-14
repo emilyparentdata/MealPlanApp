@@ -794,6 +794,23 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   font-style: italic;
   font-size: 0.85rem;
 }
+.grocery-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.grocery-check input[type="checkbox"] {
+  margin-top: 0.2rem;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.grocery-check.checked span {
+  text-decoration: line-through;
+  color: var(--text-light);
+}
 
 /* === Manage === */
 .manage-section {
@@ -1077,11 +1094,299 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 /* === Responsive === */
 @media (max-width: 768px) {
-  header { flex-direction: column; align-items: flex-start; }
-  .recipe-grid { grid-template-columns: 1fr; }
+  /* -- Header: compact on mobile -- */
+  header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.6rem 1rem;
+    gap: 0.5rem;
+  }
+  header h1 {
+    font-size: 1.1rem;
+  }
+
+  /* -- Nav: touch-friendly wrapping grid -- */
+  #main-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .nav-btn {
+    padding: 0.55rem 0.85rem;
+    font-size: 0.82rem;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-sep {
+    display: none;
+  }
+
+  /* -- User info row -- */
+  #user-info {
+    margin-left: 0;
+    justify-content: space-between;
+    font-size: 0.8rem;
+  }
+
+  /* -- Main content: reduce side padding -- */
+  main {
+    padding: 1rem 0.75rem;
+  }
+  .page-header h2 {
+    font-size: 1.25rem;
+  }
+
+  /* -- Buttons: larger touch targets -- */
+  .btn {
+    min-height: 44px;
+    padding: 0.6rem 1.25rem;
+    font-size: 0.9rem;
+  }
+  .btn.large {
+    padding: 0.85rem 1.75rem;
+    font-size: 1rem;
+  }
+
+  /* -- Home cards: single column -- */
   .home-grid.main-tiles { grid-template-columns: 1fr; }
   .home-grid.admin-tiles { grid-template-columns: repeat(2, 1fr); }
+
+  /* -- Recipe grid: single column -- */
+  .recipe-grid { grid-template-columns: 1fr; }
+
+  /* -- Modal: nearly full-screen -- */
+  .modal {
+    padding: 0;
+    align-items: stretch;
+  }
+  .modal-content {
+    max-width: 100%;
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+    padding: 1.25rem 1rem;
+  }
+  .modal-close {
+    top: 0.5rem;
+    right: 0.75rem;
+    font-size: 1.75rem;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* -- Planner day cards: stack who-home below day name -- */
+  .planner-day-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .planner-day-header h3 {
+    min-width: auto;
+  }
+  .who-home {
+    width: 100%;
+    gap: 0.75rem;
+  }
+  .who-home label {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+  }
+  .planner-day-meal {
+    flex-wrap: wrap;
+  }
+  .planner-day-meal select {
+    min-height: 40px;
+    font-size: 0.9rem;
+  }
+  .planner-day-meal .suggest-btn,
+  .planner-day-meal .clear-btn {
+    min-height: 40px;
+    padding: 0.5rem 0.85rem;
+  }
+
+  /* -- Plan view cards: stack vertically with spacing -- */
+  .plan-day-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+  .plan-day-card .day-name {
+    min-width: auto;
+  }
+
+  /* -- Grocery list: larger items for touch scanning -- */
   .grocery-ingredients { columns: 1; }
-  .pref-row { flex-direction: column; align-items: flex-start; }
-  .plan-day-card { flex-direction: column; align-items: flex-start; }
+  .grocery-ingredients li {
+    padding: 0.45rem 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .grocery-day {
+    padding: 1rem;
+  }
+  .grocery-day h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  .grocery-meal-name {
+    font-size: 1.1rem;
+    margin-bottom: 0.6rem;
+  }
+
+  /* -- Preferences: flow controls on small screens -- */
+  .pref-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.85rem 0.75rem;
+  }
+  .pref-controls {
+    width: 100%;
+  }
+  .pref-flags {
+    gap: 0.4rem;
+  }
+  .doesnt-eat-btns {
+    gap: 0.4rem;
+  }
+
+  /* -- Flag buttons: larger touch targets -- */
+  .flag-btn {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* -- Week selector: ensure it fits -- */
+  .week-selector {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .week-selector button {
+    min-height: 40px;
+    padding: 0.5rem 0.85rem;
+  }
+  #week-label, #view-week-label, #grocery-week-label {
+    min-width: 140px;
+    font-size: 0.9rem;
+  }
+
+  /* -- Search inputs -- */
+  #recipe-search, #pref-search {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* -- Manage section -- */
+  .manage-recipe-row {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  .manage-recipe-cats {
+    width: 100%;
+    flex-shrink: 1;
+  }
+
+  /* -- Feedback cards -- */
+  .feedback-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  /* -- Fav button: larger tap target -- */
+  .fav-btn {
+    font-size: 1.4rem;
+    padding: 0.25rem;
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* -- Toast: wider on mobile -- */
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    transform: none;
+    text-align: center;
+  }
+
+  /* -- Sign out button: bigger target -- */
+  .sign-out-btn {
+    min-height: 36px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  /* -- Page header: wrap better -- */
+  .page-header {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  /* -- Filter bar -- */
+  #pref-filter-bar {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+}
+
+/* === Extra small screens (phones in portrait) === */
+@media (max-width: 400px) {
+  header {
+    padding: 0.5rem 0.6rem;
+  }
+  header h1 {
+    font-size: 1rem;
+  }
+  main {
+    padding: 0.75rem 0.5rem;
+  }
+  .nav-btn {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.78rem;
+  }
+  .home-grid.admin-tiles {
+    grid-template-columns: 1fr;
+  }
+  .home-card {
+    padding: 1rem 0.75rem;
+  }
+  .modal-content {
+    padding: 1rem 0.75rem;
+  }
+  .planner-day {
+    padding: 0.75rem;
+  }
+  .grocery-day {
+    padding: 0.75rem;
+  }
+  .manage-section {
+    padding: 1rem;
+  }
+  .week-selector {
+    gap: 0.5rem;
+  }
+  #week-label, #view-week-label, #grocery-week-label {
+    min-width: 120px;
+    font-size: 0.85rem;
+  }
+  .planner-actions {
+    flex-direction: column;
+  }
+  .planner-actions .btn {
+    width: 100%;
+    text-align: center;
+  }
 }
