@@ -4,12 +4,15 @@ import { getWeekKey, getWeekLabel } from './planner.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+let lastMeals = null;
+
 export async function renderGroceryList(container, weekLabelEl) {
   const weekKey = getWeekKey();
   weekLabelEl.textContent = getWeekLabel();
 
   const plan = await loadCommittedPlan(weekKey);
   container.innerHTML = '';
+  lastMeals = null;
 
   if (!plan || !plan.days) {
     container.innerHTML = '<p style="color:var(--text-light);">No committed plan for this week.</p>';
@@ -35,6 +38,8 @@ export async function renderGroceryList(container, weekLabelEl) {
     container.innerHTML = '<p style="color:var(--text-light);">No meals planned this week.</p>';
     return;
   }
+
+  lastMeals = meals;
 
   // Render day-by-day with ingredients
   let html = '';
@@ -78,12 +83,11 @@ export async function renderGroceryList(container, weekLabelEl) {
       sessionStorage.setItem(checkedKey, JSON.stringify(state));
     });
   });
-
-  // Store text version for copy/email
-  container.dataset.fullText = buildFullText(meals);
 }
 
-function buildFullText(meals) {
+// === Text output for copy/email ===
+
+function buildPlanText(meals) {
   const lines = [];
   for (const m of meals) {
     if (m.type === 'skip') {
@@ -92,25 +96,62 @@ function buildFullText(meals) {
       let header = `${m.day}: ${m.recipe.name}`;
       if (m.sides) header += ` + ${m.sides}`;
       lines.push(header);
-      if (m.recipe.ingredients) {
-        const ingredients = m.recipe.ingredients.split('\n').map(l => l.trim()).filter(Boolean);
-        for (const i of ingredients) {
-          lines.push(`  - ${i}`);
-        }
-      }
-      lines.push('');
     }
   }
   return lines.join('\n');
 }
 
+function buildAggregatedGroceryText(meals) {
+  // Collect all ingredients, try to merge duplicates
+  const ingredientMap = new Map(); // normalized key -> { display, meals[] }
+
+  for (const m of meals) {
+    if (m.type !== 'meal' || !m.recipe.ingredients) continue;
+    const ingredients = m.recipe.ingredients.split('\n').map(l => l.trim()).filter(Boolean);
+    for (const ing of ingredients) {
+      const key = normalizeIngredient(ing);
+      if (ingredientMap.has(key)) {
+        const entry = ingredientMap.get(key);
+        entry.meals.push(m.recipe.name);
+      } else {
+        ingredientMap.set(key, { display: ing, meals: [m.recipe.name] });
+      }
+    }
+  }
+
+  const lines = [];
+  for (const [, entry] of ingredientMap) {
+    if (entry.meals.length > 1) {
+      lines.push(`${entry.display}  (${entry.meals.join(', ')})`);
+    } else {
+      lines.push(entry.display);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function normalizeIngredient(ing) {
+  // Strip leading quantities/measurements to find the core ingredient
+  // "1.5 cups shredded mozzarella" -> "shredded mozzarella"
+  // "2 tbsp olive oil" -> "olive oil"
+  return ing
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')      // remove punctuation
+    .replace(/^\s*[\d\s\/\.]+/, '') // remove leading numbers/fractions
+    .replace(/^(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|cloves?|cans?|packages?|slices?|heads?|stalks?|sprigs?|pinch(es)?|bunch(es)?|handful|large|medium|small)\s+/i, '') // remove units
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function getGroceryText() {
-  const container = document.getElementById('grocery-list');
-  return container.dataset.fullText || '';
+  if (!lastMeals) return '';
+  return `MEAL PLAN\n${'='.repeat(40)}\n${buildPlanText(lastMeals)}\n\nGROCERY LIST\n${'='.repeat(40)}\n${buildAggregatedGroceryText(lastMeals)}`;
 }
 
 export function getPlanSummary() {
-  return getGroceryText();
+  if (!lastMeals) return '';
+  return buildPlanText(lastMeals);
 }
 
 function escHtml(str) {

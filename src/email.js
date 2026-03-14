@@ -21,10 +21,7 @@ export async function sendPlanEmail() {
 
   // If EmailJS not configured, offer clipboard fallback
   if (!isEmailConfigured()) {
-    const fullText = `Family Meals — ${weekLabel}\n\n` +
-      `MEAL PLAN:\n${planSummary}\n\n` +
-      `GROCERY LIST:\n${groceryList}`;
-
+    const fullText = `Family Meals — ${weekLabel}\n\n${groceryList}`;
     await navigator.clipboard.writeText(fullText);
     return { fallback: true, text: fullText };
   }

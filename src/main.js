@@ -498,9 +498,10 @@ function setupGroceryPage() {
   });
 
   document.getElementById('copy-grocery-btn').addEventListener('click', async () => {
+    if (groceryLoading) await groceryLoading;
     const text = getGroceryText();
     if (!text) {
-      showToast('Nothing to copy.');
+      showToast('Nothing to copy — no meals planned this week.');
       return;
     }
     try {
@@ -512,10 +513,11 @@ function setupGroceryPage() {
   });
 
   document.getElementById('email-plan-btn').addEventListener('click', async () => {
+    if (groceryLoading) await groceryLoading;
     try {
       const result = await sendPlanEmail();
       if (result.fallback) {
-        showToast('Plan + grocery list copied to clipboard! (Email not configured yet)');
+        showToast('Plan + grocery list copied to clipboard!');
       } else {
         showToast('Email sent!');
       }
@@ -525,9 +527,10 @@ function setupGroceryPage() {
   });
 }
 
+let groceryLoading = null;
 function refreshGrocery() {
   document.getElementById('grocery-week-label').textContent = getWeekLabel();
-  renderGroceryList(
+  groceryLoading = renderGroceryList(
     document.getElementById('grocery-list'),
     document.getElementById('grocery-week-label')
   );
