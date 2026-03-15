@@ -71,6 +71,7 @@ async function initApp(household) {
 
   setupHomePage();
   setupSignOut();
+  setupEditModal();
 
   // Show household name + invite code in header
   if (household) {
@@ -353,6 +354,7 @@ function refreshRecipes() {
   const recipes = filterRecipes(query);
   const prefs = getAllPreferences();
   renderRecipeList(document.getElementById('recipe-list'), recipes, (recipe) => {
+    currentDetailRecipe = recipe;
     renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
     document.getElementById('recipe-modal').classList.remove('hidden');
   }, prefs, {
@@ -479,6 +481,7 @@ function refreshPlanView() {
     getViewWeekKey(),
     getViewWeekLabel(),
     (recipe) => {
+      currentDetailRecipe = recipe;
       renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
       document.getElementById('recipe-modal').classList.remove('hidden');
     }
@@ -976,8 +979,10 @@ function refreshManageRecipeList() {
     row.innerHTML = `
       <span class="manage-recipe-name">${escManage(r.name)}</span>
       <span class="manage-recipe-cats">${(r.categories || []).join(', ')}</span>
+      <button class="btn edit-btn">Edit</button>
       <button class="btn delete-btn">Delete</button>
     `;
+    row.querySelector('.edit-btn').addEventListener('click', () => openEditModal(r));
     row.querySelector('.delete-btn').addEventListener('click', async () => {
       if (!confirm(`Delete "${r.name}"? This can't be undone.`)) return;
       await archiveRecipe(r.uid);
@@ -994,6 +999,77 @@ function escManage(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+
+// === Edit Recipe Modal ===
+let currentDetailRecipe = null;
+let currentEditRecipe = null;
+
+function setupEditModal() {
+  // Close buttons
+  document.querySelector('.edit-modal-close').addEventListener('click', closeEditModal);
+  document.getElementById('edit-recipe-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeEditModal();
+  });
+  document.getElementById('cancel-edit-btn').addEventListener('click', closeEditModal);
+
+  // Save
+  document.getElementById('save-edit-btn').addEventListener('click', async () => {
+    if (!currentEditRecipe) return;
+    const name = document.getElementById('edit-recipe-name').value.trim();
+    if (!name) {
+      showToast('Recipe name is required.');
+      return;
+    }
+
+    const updated = {
+      ...currentEditRecipe,
+      name,
+      ingredients: document.getElementById('edit-recipe-ingredients').value,
+      directions: document.getElementById('edit-recipe-directions').value,
+      servings: document.getElementById('edit-recipe-servings').value,
+      prep_time: document.getElementById('edit-recipe-prep').value,
+      cook_time: document.getElementById('edit-recipe-cook').value,
+      categories: document.getElementById('edit-recipe-categories').value
+        .split(',').map(s => s.trim()).filter(Boolean),
+      source: document.getElementById('edit-recipe-source').value,
+      notes: document.getElementById('edit-recipe-notes').value,
+    };
+
+    await saveRecipeToFirebase(updated);
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    closeEditModal();
+    refreshManageRecipeList();
+    showToast(`"${name}" updated.`);
+  });
+
+  // Edit from detail modal
+  document.getElementById('edit-from-detail-btn').addEventListener('click', () => {
+    if (!currentDetailRecipe) return;
+    document.getElementById('recipe-modal').classList.add('hidden');
+    openEditModal(currentDetailRecipe);
+  });
+}
+
+function openEditModal(recipe) {
+  currentEditRecipe = recipe;
+  document.getElementById('edit-recipe-uid').value = recipe.uid;
+  document.getElementById('edit-recipe-name').value = recipe.name || '';
+  document.getElementById('edit-recipe-ingredients').value = recipe.ingredients || '';
+  document.getElementById('edit-recipe-directions').value = recipe.directions || '';
+  document.getElementById('edit-recipe-servings').value = recipe.servings || '';
+  document.getElementById('edit-recipe-prep').value = recipe.prep_time || '';
+  document.getElementById('edit-recipe-cook').value = recipe.cook_time || '';
+  document.getElementById('edit-recipe-categories').value = (recipe.categories || []).join(', ');
+  document.getElementById('edit-recipe-source').value = recipe.source || '';
+  document.getElementById('edit-recipe-notes').value = recipe.notes || '';
+  document.getElementById('edit-recipe-modal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-recipe-modal').classList.add('hidden');
+  currentEditRecipe = null;
 }
 
 // === Toast ===

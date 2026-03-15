@@ -1093,6 +1093,54 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   background: var(--love);
   color: white;
 }
+.edit-btn {
+  color: var(--primary);
+  border-color: var(--primary);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+}
+.edit-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* Edit Recipe Modal */
+.edit-recipe-form label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 0.25rem;
+  margin-top: 0.75rem;
+}
+.edit-recipe-form label:first-of-type {
+  margin-top: 0;
+}
+.edit-recipe-form input[type="text"],
+.edit-recipe-form textarea {
+  width: 100%;
+  margin-bottom: 0;
+}
+.edit-recipe-form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+.edit-recipe-form .form-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.edit-recipe-form .form-row div {
+  flex: 1;
+}
+.edit-recipe-form .form-row label {
+  margin-top: 0;
+}
+.edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
 
 .planner-instructions {
   color: var(--text-light);

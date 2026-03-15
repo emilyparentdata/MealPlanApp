@@ -294,6 +294,39 @@
     <div class="modal-content">
       <button class="modal-close">&times;</button>
       <div id="recipe-detail"></div>
+      <button id="edit-from-detail-btn" class="btn" style="margin-top:1rem">Edit Recipe</button>
+    </div>
+  </div>
+
+  <!-- Edit Recipe Modal (global) -->
+  <div id="edit-recipe-modal" class="modal hidden">
+    <div class="modal-content">
+      <button class="modal-close edit-modal-close">&times;</button>
+      <h2>Edit Recipe</h2>
+      <div id="edit-recipe-form" class="edit-recipe-form">
+        <input type="hidden" id="edit-recipe-uid">
+        <label>Name</label>
+        <input type="text" id="edit-recipe-name">
+        <label>Ingredients (one per line)</label>
+        <textarea id="edit-recipe-ingredients"></textarea>
+        <label>Directions</label>
+        <textarea id="edit-recipe-directions"></textarea>
+        <div class="form-row">
+          <div><label>Servings</label><input type="text" id="edit-recipe-servings"></div>
+          <div><label>Prep time</label><input type="text" id="edit-recipe-prep"></div>
+          <div><label>Cook time</label><input type="text" id="edit-recipe-cook"></div>
+        </div>
+        <label>Categories (comma separated)</label>
+        <input type="text" id="edit-recipe-categories">
+        <label>Source / URL</label>
+        <input type="text" id="edit-recipe-source">
+        <label>Notes</label>
+        <textarea id="edit-recipe-notes"></textarea>
+        <div class="edit-actions">
+          <button id="save-edit-btn" class="btn primary">Save Changes</button>
+          <button id="cancel-edit-btn" class="btn">Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 
