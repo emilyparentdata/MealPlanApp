@@ -374,3 +374,21 @@ export async function loadHouseholdRecipes() {
   });
 }
 
+// === Grocery Extras ===
+
+export async function loadGroceryExtras() {
+  if (!firebaseEnabled || !householdId) {
+    return JSON.parse(localStorage.getItem('grocery_extras') || '[]');
+  }
+  const doc = await col('settings').doc('groceryExtras').get();
+  return doc.exists ? (doc.data().items || []) : [];
+}
+
+export async function saveGroceryExtras(items) {
+  if (!firebaseEnabled || !householdId) {
+    localStorage.setItem('grocery_extras', JSON.stringify(items));
+    return;
+  }
+  await col('settings').doc('groceryExtras').set({ items });
+}
+

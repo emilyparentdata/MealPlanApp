@@ -1,4 +1,4 @@
-import { loadCommittedPlan } from './firebase.js';
+import { loadCommittedPlan, loadGroceryExtras, saveGroceryExtras } from './firebase.js';
 import { getRecipeByUid } from './recipes.js';
 import { getWeekKey, getWeekLabel } from './planner.js';
 
@@ -262,11 +262,25 @@ function buildGroceryText(meals) {
     }
   }
 
+  // Extra items
+  if (extraItems.length) {
+    lines.push('');
+    lines.push('EXTRA ITEMS');
+    for (const item of extraItems) {
+      lines.push(`[ ] ${item}`);
+    }
+  }
+
   return lines.join('\n');
 }
 
 export function getGroceryText() {
-  if (!lastMeals) return '';
+  if (!lastMeals && !extraItems.length) return '';
+  if (!lastMeals) {
+    return extraItems.length
+      ? 'EXTRA ITEMS\n' + extraItems.map(i => `[ ] ${i}`).join('\n')
+      : '';
+  }
   return buildGroceryText(lastMeals);
 }
 
@@ -281,6 +295,67 @@ export function getPlanSummary() {
 export function clearChecked() {
   if (!currentWeekKey) return;
   localStorage.removeItem(`grocery_checked_${currentWeekKey}`);
+}
+
+// === Extra grocery items ===
+
+let extraItems = [];
+
+export async function loadAndRenderExtras(container) {
+  extraItems = await loadGroceryExtras();
+  renderExtras(container);
+}
+
+function renderExtras(container) {
+  const storageKey = currentWeekKey ? `grocery_extras_checked_${currentWeekKey}` : 'grocery_extras_checked';
+  const checked = JSON.parse(localStorage.getItem(storageKey) || '{}');
+
+  if (!extraItems.length) {
+    container.innerHTML = '<p class="grocery-extras-empty">No extra items yet. Add staples like eggs, milk, or bread.</p>';
+    return;
+  }
+
+  container.innerHTML = `<ul class="grocery-checklist-items">${extraItems.map((item, idx) => {
+    const isChecked = checked[idx] ? 'checked' : '';
+    const checkedClass = checked[idx] ? ' checked' : '';
+    return `<li>
+      <label class="grocery-check${checkedClass}">
+        <input type="checkbox" data-extra-idx="${idx}" ${isChecked}>
+        <span class="grocery-item-text">${escHtml(item)}</span>
+      </label>
+      <button class="extra-remove-btn" data-extra-idx="${idx}" title="Remove">&times;</button>
+    </li>`;
+  }).join('')}</ul>`;
+
+  // Checkboxes
+  container.querySelectorAll('.grocery-check input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.closest('label').classList.toggle('checked', cb.checked);
+      const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      if (cb.checked) { state[cb.dataset.extraIdx] = true; } else { delete state[cb.dataset.extraIdx]; }
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    });
+  });
+
+  // Remove buttons
+  container.querySelectorAll('.extra-remove-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      extraItems.splice(parseInt(btn.dataset.extraIdx), 1);
+      await saveGroceryExtras(extraItems);
+      renderExtras(container);
+    });
+  });
+}
+
+export async function addExtraItem(item, container) {
+  if (!item.trim()) return;
+  extraItems.push(item.trim());
+  await saveGroceryExtras(extraItems);
+  renderExtras(container);
+}
+
+export function getExtraItems() {
+  return extraItems;
 }
 
 function escHtml(str) {

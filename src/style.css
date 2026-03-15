@@ -841,6 +841,55 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   text-decoration: line-through;
 }
 
+/* Extra items */
+.grocery-extras-section {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
+}
+.grocery-extras-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+  margin-bottom: 0.5rem;
+}
+.grocery-extras-add {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.grocery-extras-add input {
+  flex: 1;
+}
+.grocery-extras-empty {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+.grocery-checklist-items li {
+  position: relative;
+}
+.extra-remove-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  border-radius: 4px;
+}
+.extra-remove-btn:hover {
+  color: var(--love);
+  background: var(--bg);
+}
+
 /* Action buttons */
 .grocery-actions {
   display: flex;

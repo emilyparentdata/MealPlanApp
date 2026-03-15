@@ -3,7 +3,7 @@ import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRe
 import { initPreferences, renderPreferenceList, getAllPreferences, toggleFavorite } from './preferences.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey } from './planner.js';
 import { renderPlanView } from './plan-view.js';
-import { renderGroceryList, getGroceryText, clearChecked } from './grocery.js';
+import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
 import { renderFeedbackPage } from './feedback.js';
 
 // === State ===
@@ -540,6 +540,19 @@ function setupGroceryPage() {
     }
   });
 
+  // Extra items
+  const extrasContainer = document.getElementById('grocery-extras-list');
+  const extraInput = document.getElementById('grocery-extra-input');
+
+  document.getElementById('add-extra-btn').addEventListener('click', async () => {
+    await addExtraItem(extraInput.value, extrasContainer);
+    extraInput.value = '';
+    extraInput.focus();
+  });
+  extraInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('add-extra-btn').click();
+  });
+
   document.getElementById('clear-checked-btn').addEventListener('click', () => {
     clearChecked();
     refreshGrocery();
@@ -550,6 +563,7 @@ function setupGroceryPage() {
 let groceryLoading = null;
 function refreshGrocery() {
   document.getElementById('grocery-week-label').textContent = getWeekLabel();
+  loadAndRenderExtras(document.getElementById('grocery-extras-list'));
   groceryLoading = renderGroceryList(
     document.getElementById('grocery-checklist'),
     document.getElementById('grocery-list'),
