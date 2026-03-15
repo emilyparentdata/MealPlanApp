@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Family Meals</title>
+  <title>Dinner, Planned</title>
   <link rel="stylesheet" href="src/style.css">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -14,8 +14,9 @@
   <!-- Login Screen -->
   <div id="login-screen">
     <div class="login-card">
-      <h1>Family Meals</h1>
-      <p class="login-subtitle">Plan meals, rate recipes, and coordinate dinner as a family.</p>
+      <h1>Dinner, Planned</h1>
+      <p class="brand-byline">by <a href="https://www.parentdata.org" target="_blank">ParentData</a></p>
+      <p class="login-subtitle">Plan meals, rate recipes, and get dinner on the table together.</p>
       <div id="login-form">
         <button id="google-signin-btn" class="btn login-btn google-btn">Sign in with Google</button>
         <div class="login-divider"><span>or</span></div>
@@ -28,7 +29,7 @@
         <input type="text" id="beta-code" placeholder="Beta access code (for new accounts)" class="beta-code-input">
         <p id="login-error" class="login-error hidden"></p>
       </div>
-      <a href="guide.html" target="_blank" class="login-guide-link">How does Family Meals work?</a>
+      <a href="guide.html" target="_blank" class="login-guide-link">How does Dinner, Planned work?</a>
     </div>
   </div>
 
@@ -65,7 +66,7 @@
   <!-- App (hidden until authenticated + household set) -->
   <div id="app-container" class="hidden">
   <header>
-    <h1 id="home-link" style="cursor:pointer">Family Meals</h1>
+    <h1 id="home-link" style="cursor:pointer">Dinner, Planned</h1>
     <nav id="main-nav">
       <button class="nav-btn active" data-page="home">Home</button>
       <button class="nav-btn primary-nav" data-page="preferences">Rate Recipes</button>

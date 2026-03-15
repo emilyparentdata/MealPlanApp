@@ -50,6 +50,15 @@ body {
   font-size: 1.8rem;
   margin-bottom: 0.5rem;
 }
+.login-card .brand-byline {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-bottom: 0.75rem;
+}
+.login-card .brand-byline a {
+  color: var(--primary);
+  text-decoration: underline;
+}
 .login-subtitle {
   color: var(--text-light);
   font-size: 0.9rem;
@@ -205,6 +214,15 @@ header {
 header h1 {
   font-size: 1.4rem;
   white-space: nowrap;
+}
+
+header .brand-byline {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+header .brand-byline a {
+  color: white;
+  text-decoration: underline;
 }
 
 #main-nav {
