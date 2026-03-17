@@ -225,13 +225,6 @@
     <section id="page-manage" class="page hidden">
       <h2>Manage Recipes</h2>
 
-      <!-- Recipe List (top) -->
-      <div id="manage-recipe-list-section" class="manage-section">
-        <h3>Your Recipes <span id="manage-recipe-count"></span></h3>
-        <input type="text" id="manage-search" placeholder="Search recipes...">
-        <div id="manage-recipe-list"></div>
-      </div>
-
       <!-- Add Recipes -->
       <div class="manage-section">
         <h3>Add Recipes</h3>
@@ -328,6 +321,18 @@
           <p class="section-help">Pick from curated recipe packs to get started quickly.</p>
           <div id="manage-starter-packs"></div>
           <button id="add-starter-btn" class="btn primary" style="margin-top:0.75rem">Add Selected Recipes</button>
+        </div>
+      </div>
+
+      <!-- Your Recipes (collapsible) -->
+      <div id="manage-recipe-list-section" class="manage-section">
+        <button id="toggle-recipe-list" class="recipe-list-toggle">
+          <span>Your Recipes <span id="manage-recipe-count"></span></span>
+          <span class="toggle-arrow">&#9654;</span>
+        </button>
+        <div id="recipe-list-body" class="recipe-list-body hidden">
+          <input type="text" id="manage-search" placeholder="Search recipes...">
+          <div id="manage-recipe-list"></div>
         </div>
       </div>
     </section>

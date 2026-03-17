@@ -1122,6 +1122,42 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 #scan-status.hidden { display: none; }
 #scan-error.hidden { display: none; }
 
+.recipe-list-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+}
+
+.recipe-list-toggle:hover {
+  color: var(--primary);
+}
+
+.toggle-arrow {
+  font-size: 0.8rem;
+  transition: transform 0.2s;
+}
+
+.recipe-list-toggle.open .toggle-arrow {
+  transform: rotate(90deg);
+}
+
+.recipe-list-body {
+  margin-top: 1rem;
+}
+
+.recipe-list-body.hidden {
+  display: none;
+}
+
 .add-recipe-tabs {
   display: flex;
   gap: 0;

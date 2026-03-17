@@ -631,6 +631,14 @@ async function setupStarterPacksOnManage() {
 let pendingImport = [];
 
 function setupManagePage() {
+  // Toggle recipe list
+  document.getElementById('toggle-recipe-list').addEventListener('click', () => {
+    const btn = document.getElementById('toggle-recipe-list');
+    const body = document.getElementById('recipe-list-body');
+    btn.classList.toggle('open');
+    body.classList.toggle('hidden');
+  });
+
   // Add recipe tabs
   document.querySelectorAll('.add-tab').forEach(tab => {
     tab.addEventListener('click', () => {
