@@ -243,7 +243,7 @@ function normalizeCategories(category, cuisine) {
 
 // === Scan Recipe from Photo ===
 
-exports.scanRecipe = functions.https.onCall(async (data, context) => {
+exports.scanRecipe = functions.runWith({ secrets: ["ANTHROPIC_API_KEY"] }).https.onCall(async (data, context) => {
   const { imageBase64, mimeType } = data;
 
   if (!imageBase64) {
