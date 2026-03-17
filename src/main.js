@@ -742,6 +742,9 @@ function setupManagePage() {
 
   // URL import
   setupUrlImport();
+
+  // Photo scan
+  setupScanImport();
 }
 
 // === URL Import ===
@@ -857,6 +860,134 @@ function setupUrlImport() {
   document.getElementById('url-import-cancel-btn').addEventListener('click', () => {
     pendingUrlRecipe = null;
     document.getElementById('url-import-preview').classList.add('hidden');
+  });
+}
+
+// === Photo Scan Import ===
+
+let pendingScanRecipe = null;
+
+function setupScanImport() {
+  const fileInput = document.getElementById('scan-file');
+  const fileNameEl = document.getElementById('scan-file-name');
+  const preview = document.getElementById('scan-preview');
+  const imagePreview = document.getElementById('scan-image-preview');
+  const result = document.getElementById('scan-result');
+  const status = document.getElementById('scan-status');
+  const errorEl = document.getElementById('scan-error');
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    fileNameEl.textContent = file.name;
+    errorEl.classList.add('hidden');
+    preview.classList.add('hidden');
+    status.classList.remove('hidden');
+
+    // Show thumbnail
+    const thumbUrl = URL.createObjectURL(file);
+    imagePreview.innerHTML = `<img src="${thumbUrl}" class="scan-image-thumb" alt="Recipe photo">`;
+
+    try {
+      // Read file as base64
+      const base64 = await fileToBase64(file);
+
+      const scanRecipe = firebase.functions().httpsCallable('scanRecipe');
+      const response = await scanRecipe({
+        imageBase64: base64,
+        mimeType: file.type || 'image/jpeg',
+      });
+
+      const recipe = response.data;
+
+      if (!recipe || !recipe.name) {
+        throw new Error('Couldn\'t read a recipe from this image.');
+      }
+
+      pendingScanRecipe = {
+        uid: 'scan_' + Date.now(),
+        name: recipe.name || '',
+        ingredients: recipe.ingredients || '',
+        directions: recipe.directions || '',
+        servings: recipe.servings || '',
+        prep_time: recipe.prep_time || '',
+        cook_time: recipe.cook_time || '',
+        categories: recipe.categories || [],
+        source: recipe.source || 'Photo scan',
+        notes: recipe.notes || '',
+        rating: 0,
+      };
+
+      // Show preview
+      result.innerHTML = `
+        <div class="url-recipe-preview">
+          <h4>${escManage(recipe.name)}</h4>
+          <div class="preview-field">
+            ${recipe.prep_time ? `Prep: ${escManage(recipe.prep_time)}` : ''}
+            ${recipe.cook_time ? ` &middot; Cook: ${escManage(recipe.cook_time)}` : ''}
+            ${recipe.servings ? ` &middot; Serves: ${escManage(recipe.servings)}` : ''}
+          </div>
+          ${recipe.ingredients ? `<div class="preview-field"><strong>Ingredients</strong><div class="preview-content">${escManage(recipe.ingredients)}</div></div>` : ''}
+          ${recipe.directions ? `<div class="preview-field"><strong>Directions</strong><div class="preview-content">${escManage(recipe.directions)}</div></div>` : ''}
+        </div>
+      `;
+      preview.classList.remove('hidden');
+    } catch (err) {
+      const msg = err.message || 'Failed to scan recipe.';
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    } finally {
+      status.classList.add('hidden');
+    }
+  });
+
+  // Save directly
+  document.getElementById('scan-save-btn').addEventListener('click', async () => {
+    if (!pendingScanRecipe) return;
+    await saveRecipeToFirebase(pendingScanRecipe);
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    refreshManageRecipeList();
+    showToast(`"${pendingScanRecipe.name}" saved!`);
+    resetScan();
+  });
+
+  // Edit first — pre-fill the manual form
+  document.getElementById('scan-edit-btn').addEventListener('click', () => {
+    if (!pendingScanRecipe) return;
+    document.getElementById('new-recipe-name').value = pendingScanRecipe.name || '';
+    document.getElementById('new-recipe-ingredients').value = pendingScanRecipe.ingredients || '';
+    document.getElementById('new-recipe-directions').value = pendingScanRecipe.directions || '';
+    document.getElementById('new-recipe-notes').value = pendingScanRecipe.notes || '';
+    resetScan();
+    showToast('Recipe loaded into form — review and save.');
+    document.getElementById('add-recipe-form').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // Cancel
+  document.getElementById('scan-cancel-btn').addEventListener('click', resetScan);
+
+  function resetScan() {
+    pendingScanRecipe = null;
+    fileInput.value = '';
+    fileNameEl.textContent = 'No photo chosen';
+    preview.classList.add('hidden');
+    imagePreview.innerHTML = '';
+    errorEl.classList.add('hidden');
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Strip the data URL prefix (data:image/jpeg;base64,)
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 }
 

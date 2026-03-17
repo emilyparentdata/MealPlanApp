@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const cheerio = require("cheerio");
+const Anthropic = require("@anthropic-ai/sdk");
 // Node 22 has built-in fetch
 
 // Extract recipe data from a URL using Schema.org JSON-LD
@@ -239,6 +240,105 @@ function normalizeCategories(category, cuisine) {
   }
   return cats.filter(Boolean);
 }
+
+// === Scan Recipe from Photo ===
+
+exports.scanRecipe = functions.https.onCall(async (data, context) => {
+  const { imageBase64, mimeType } = data;
+
+  if (!imageBase64) {
+    throw new functions.https.HttpsError("invalid-argument", "Image data is required");
+  }
+
+  const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  const mediaType = mimeType || "image/jpeg";
+  if (!validTypes.includes(mediaType)) {
+    throw new functions.https.HttpsError("invalid-argument", "Unsupported image type. Use JPEG, PNG, WebP, or GIF.");
+  }
+
+  // Check size — base64 is ~33% larger than raw, so 10MB base64 ≈ 7.5MB image
+  if (imageBase64.length > 10 * 1024 * 1024) {
+    throw new functions.https.HttpsError("invalid-argument", "Image is too large. Please use a smaller photo.");
+  }
+
+  try {
+    const client = new Anthropic();
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mediaType,
+                data: imageBase64,
+              },
+            },
+            {
+              type: "text",
+              text: `Extract the recipe from this image. Return ONLY a JSON object with these fields:
+{
+  "name": "Recipe title",
+  "ingredients": "Each ingredient on its own line, including quantities",
+  "directions": "Each step on its own line, numbered",
+  "servings": "Number of servings if shown",
+  "prep_time": "Prep time if shown",
+  "cook_time": "Cook time if shown",
+  "categories": ["array", "of", "categories"],
+  "notes": "Any extra notes from the recipe"
+}
+
+Rules:
+- Include exact quantities and measurements for ingredients
+- Keep ingredient lines simple: "2 cups flour" not "2 cups all-purpose flour, sifted (see note 3)"
+- Number the direction steps
+- If a field isn't visible in the image, use an empty string or empty array
+- Return ONLY the JSON object, no other text`,
+            },
+          ],
+        },
+      ],
+    });
+
+    const text = response.content[0].text.trim();
+
+    // Extract JSON from response (handle markdown code blocks)
+    let jsonStr = text;
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1].trim();
+    }
+
+    const recipe = JSON.parse(jsonStr);
+
+    if (!recipe.name) {
+      throw new functions.https.HttpsError("not-found", "Couldn't read a recipe from this image. Try a clearer photo.");
+    }
+
+    return {
+      name: recipe.name || "",
+      ingredients: recipe.ingredients || "",
+      directions: recipe.directions || "",
+      servings: recipe.servings || "",
+      prep_time: recipe.prep_time || "",
+      cook_time: recipe.cook_time || "",
+      categories: recipe.categories || [],
+      notes: recipe.notes || "",
+      source: "Photo scan",
+    };
+  } catch (err) {
+    if (err instanceof functions.https.HttpsError) throw err;
+    if (err instanceof SyntaxError) {
+      throw new functions.https.HttpsError("internal", "Couldn't parse the recipe from this image. Try a clearer photo.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to scan recipe: " + err.message);
+  }
+});
 
 // Fallback: scan page HTML for ingredient/direction sections
 function extractFromContent($) {

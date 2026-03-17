@@ -233,6 +233,34 @@
         <button id="add-starter-btn" class="btn primary" style="margin-top:0.75rem">Add Selected Recipes</button>
       </div>
 
+      <!-- Scan from Photo -->
+      <div id="scan-recipe-section" class="manage-section">
+        <h3>Scan a Recipe</h3>
+        <p class="section-help">Take a photo of a cookbook page or screenshot a recipe. We'll read it and add it for you.</p>
+        <div class="scan-controls">
+          <label class="btn file-upload-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:4px"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="2"/></svg>
+            Choose Photo
+            <input type="file" id="scan-file" accept="image/*" capture="environment" hidden>
+          </label>
+          <span id="scan-file-name" class="import-file-name">No photo chosen</span>
+        </div>
+        <div id="scan-preview" class="hidden">
+          <div id="scan-image-preview" style="margin-bottom:1rem;text-align:center;"></div>
+          <div id="scan-result"></div>
+          <div class="import-actions">
+            <button id="scan-save-btn" class="btn primary">Save This Recipe</button>
+            <button id="scan-edit-btn" class="btn">Edit First</button>
+            <button id="scan-cancel-btn" class="btn">Cancel</button>
+          </div>
+        </div>
+        <div id="scan-status" class="hidden" style="padding:1rem;text-align:center;color:var(--text-light);">
+          <div class="scan-spinner"></div>
+          Reading recipe from photo...
+        </div>
+        <div id="scan-error" class="hidden" style="color:#e53e3e;margin-top:0.75rem;"></div>
+      </div>
+
       <!-- Import from URL -->
       <div id="url-import-section" class="manage-section">
         <h3>Add from URL</h3>
