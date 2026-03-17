@@ -1023,7 +1023,7 @@ async function parsePaprika(file) {
   for (const entry of zip) {
     if (!entry.name.endsWith('.paprikarecipe')) continue;
     try {
-      const decompressed = await decompressGzip(entry.data);
+      const decompressed = await decompressStream(entry.data, 'gzip');
       const text = new TextDecoder().decode(decompressed);
       const obj = JSON.parse(text);
       const recipe = normalizeRecipe(obj);
@@ -1080,25 +1080,14 @@ async function loadZipEntries(file) {
     if (compMethod === 0) {
       data = compressedData;
     } else if (compMethod === 8) {
-      // Deflate — use DecompressionStream
-      const ds = new DecompressionStream('raw');
-      const writer = ds.writable.getWriter();
-      writer.write(compressedData);
-      writer.close();
-      const reader = ds.readable.getReader();
-      const chunks = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
-      data = new Uint8Array(totalLen);
-      let offset = 0;
-      for (const chunk of chunks) {
-        data.set(chunk, offset);
-        offset += chunk.length;
-      }
+      // Deflate — wrap raw deflate in zlib framing so we can use
+      // 'deflate' mode (universally supported, unlike 'raw')
+      const zlibData = new Uint8Array(compressedData.length + 6);
+      zlibData[0] = 0x78; // zlib header
+      zlibData[1] = 0x9C;
+      zlibData.set(compressedData, 2);
+      // Adler-32 checksum placeholder (4 bytes at end) — browser ignores it
+      data = await decompressStream(zlibData, 'deflate');
     } else {
       data = compressedData; // unsupported method, try anyway
     }
@@ -1110,8 +1099,8 @@ async function loadZipEntries(file) {
   return entries;
 }
 
-async function decompressGzip(data) {
-  const ds = new DecompressionStream('gzip');
+async function decompressStream(data, format) {
+  const ds = new DecompressionStream(format);
   const writer = ds.writable.getWriter();
   writer.write(data);
   writer.close();
