@@ -689,12 +689,16 @@ function setupManagePage() {
     document.getElementById('import-file-name').textContent = file.name;
 
     try {
-      const text = await file.text();
       let recipes;
-      if (file.name.endsWith('.csv')) {
-        recipes = parseCSV(text);
+      if (file.name.endsWith('.paprikarecipes')) {
+        recipes = await parsePaprika(file);
       } else {
-        recipes = parseJSON(text);
+        const text = await file.text();
+        if (file.name.endsWith('.csv')) {
+          recipes = parseCSV(text);
+        } else {
+          recipes = parseJSON(text);
+        }
       }
 
       if (!recipes.length) {
@@ -992,6 +996,123 @@ function fileToBase64(file) {
 }
 
 // === Import Parsing ===
+
+async function parsePaprika(file) {
+  // .paprikarecipes is a zip of gzipped JSON files
+  const zip = await loadZipEntries(file);
+  const recipes = [];
+
+  for (const entry of zip) {
+    if (!entry.name.endsWith('.paprikarecipe')) continue;
+    try {
+      const decompressed = await decompressGzip(entry.data);
+      const text = new TextDecoder().decode(decompressed);
+      const obj = JSON.parse(text);
+      const recipe = normalizeRecipe(obj);
+      if (recipe.name) recipes.push(recipe);
+    } catch {
+      // Skip entries that fail to parse
+    }
+  }
+
+  return recipes;
+}
+
+async function loadZipEntries(file) {
+  const buffer = await file.arrayBuffer();
+  const view = new DataView(buffer);
+  const entries = [];
+
+  // Read zip central directory
+  // Find end of central directory record (search from end)
+  let eocdOffset = -1;
+  for (let i = buffer.byteLength - 22; i >= 0; i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset === -1) throw new Error('Not a valid zip file');
+
+  const cdOffset = view.getUint32(eocdOffset + 16, true);
+  const cdEntries = view.getUint16(eocdOffset + 10, true);
+
+  let pos = cdOffset;
+  for (let i = 0; i < cdEntries; i++) {
+    if (view.getUint32(pos, true) !== 0x02014b50) break;
+
+    const compMethod = view.getUint16(pos + 10, true);
+    const compSize = view.getUint32(pos + 20, true);
+    const nameLen = view.getUint16(pos + 28, true);
+    const extraLen = view.getUint16(pos + 30, true);
+    const commentLen = view.getUint16(pos + 32, true);
+    const localHeaderOffset = view.getUint32(pos + 42, true);
+
+    const nameBytes = new Uint8Array(buffer, pos + 46, nameLen);
+    const name = new TextDecoder().decode(nameBytes);
+
+    // Read local file header to find data offset
+    const localNameLen = view.getUint16(localHeaderOffset + 26, true);
+    const localExtraLen = view.getUint16(localHeaderOffset + 28, true);
+    const dataOffset = localHeaderOffset + 30 + localNameLen + localExtraLen;
+
+    const compressedData = new Uint8Array(buffer, dataOffset, compSize);
+
+    let data;
+    if (compMethod === 0) {
+      data = compressedData;
+    } else if (compMethod === 8) {
+      // Deflate — use DecompressionStream
+      const ds = new DecompressionStream('raw');
+      const writer = ds.writable.getWriter();
+      writer.write(compressedData);
+      writer.close();
+      const reader = ds.readable.getReader();
+      const chunks = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+      data = new Uint8Array(totalLen);
+      let offset = 0;
+      for (const chunk of chunks) {
+        data.set(chunk, offset);
+        offset += chunk.length;
+      }
+    } else {
+      data = compressedData; // unsupported method, try anyway
+    }
+
+    entries.push({ name, data });
+    pos += 46 + nameLen + extraLen + commentLen;
+  }
+
+  return entries;
+}
+
+async function decompressGzip(data) {
+  const ds = new DecompressionStream('gzip');
+  const writer = ds.writable.getWriter();
+  writer.write(data);
+  writer.close();
+  const reader = ds.readable.getReader();
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+  const result = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
 
 function parseJSON(text) {
   const data = JSON.parse(text);
