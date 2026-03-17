@@ -335,7 +335,20 @@
         <div class="edit-actions">
           <button id="save-edit-btn" class="btn primary">Save Changes</button>
           <button id="cancel-edit-btn" class="btn">Cancel</button>
+          <button id="delete-from-edit-btn" class="btn" style="background:#e53e3e;color:#fff;margin-left:auto;">Delete Recipe</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div id="confirm-delete-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:400px;text-align:center;">
+      <h2 style="margin-bottom:0.5rem">Delete Recipe?</h2>
+      <p id="confirm-delete-msg" style="color:var(--text-light);margin-bottom:1.5rem;"></p>
+      <div class="edit-actions" style="justify-content:center;">
+        <button id="confirm-delete-yes" class="btn" style="background:#e53e3e;color:#fff;">Delete</button>
+        <button id="confirm-delete-no" class="btn">Cancel</button>
       </div>
     </div>
   </div>

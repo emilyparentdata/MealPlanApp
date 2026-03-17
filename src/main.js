@@ -998,7 +998,7 @@ function refreshManageRecipeList() {
     `;
     row.querySelector('.edit-btn').addEventListener('click', () => openEditModal(r));
     row.querySelector('.delete-btn').addEventListener('click', async () => {
-      if (!confirm(`Delete "${r.name}"? This can't be undone.`)) return;
+      if (!await confirmDelete(r.name)) return;
       await archiveRecipe(r.uid);
       await loadHouseholdRecipes();
       await loadRecipes();
@@ -1058,6 +1058,19 @@ function setupEditModal() {
     showToast(`"${name}" updated.`);
   });
 
+  // Delete from edit modal
+  document.getElementById('delete-from-edit-btn').addEventListener('click', async () => {
+    if (!currentEditRecipe) return;
+    const name = currentEditRecipe.name;
+    if (!await confirmDelete(name)) return;
+    await archiveRecipe(currentEditRecipe.uid);
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    closeEditModal();
+    refreshManageRecipeList();
+    showToast(`"${name}" deleted.`);
+  });
+
   // Edit from detail modal
   document.getElementById('edit-from-detail-btn').addEventListener('click', () => {
     if (!currentDetailRecipe) return;
@@ -1084,6 +1097,34 @@ function openEditModal(recipe) {
 function closeEditModal() {
   document.getElementById('edit-recipe-modal').classList.add('hidden');
   currentEditRecipe = null;
+}
+
+// === Confirm Delete Modal ===
+function confirmDelete(recipeName) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirm-delete-modal');
+    const msg = document.getElementById('confirm-delete-msg');
+    const yesBtn = document.getElementById('confirm-delete-yes');
+    const noBtn = document.getElementById('confirm-delete-no');
+
+    msg.textContent = `"${recipeName}" will be removed. This can't be undone.`;
+    modal.classList.remove('hidden');
+
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      modal.removeEventListener('click', onBackdrop);
+      resolve(result);
+    }
+    function onYes() { cleanup(true); }
+    function onNo() { cleanup(false); }
+    function onBackdrop(e) { if (e.target === modal) cleanup(false); }
+
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+    modal.addEventListener('click', onBackdrop);
+  });
 }
 
 // === Toast ===

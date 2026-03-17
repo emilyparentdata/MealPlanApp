@@ -4,6 +4,33 @@ import { getRecipePrefs, toggleDoesntEat, toggleFavorite } from './preferences.j
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+function confirmDelete(recipeName) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirm-delete-modal');
+    const msg = document.getElementById('confirm-delete-msg');
+    const yesBtn = document.getElementById('confirm-delete-yes');
+    const noBtn = document.getElementById('confirm-delete-no');
+
+    msg.textContent = `"${recipeName}" will be removed. This can't be undone.`;
+    modal.classList.remove('hidden');
+
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      modal.removeEventListener('click', onBackdrop);
+      resolve(result);
+    }
+    function onYes() { cleanup(true); }
+    function onNo() { cleanup(false); }
+    function onBackdrop(e) { if (e.target === modal) cleanup(false); }
+
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+    modal.addEventListener('click', onBackdrop);
+  });
+}
+
 function getCurrentWeekKey() {
   const now = new Date();
   const day = now.getDay();
@@ -148,7 +175,7 @@ function createMealCard(meal, pageContainer) {
 
   // Delete recipe
   card.querySelector('[data-action="delete"]').addEventListener('click', async () => {
-    if (!confirm(`Remove "${meal.name}" from all future meal plans?`)) return;
+    if (!await confirmDelete(meal.name)) return;
     await archiveRecipe(meal.recipeUid);
     await loadRecipes();
     showToast(`"${meal.name}" removed.`);

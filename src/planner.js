@@ -106,6 +106,8 @@ export async function renderPlanner(container, members) {
 
     const whoHome = dayData.whoHome || [...plannerMembers];
 
+    const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
+
     const dayEl = document.createElement('div');
     dayEl.className = 'planner-day';
     dayEl.dataset.day = dayName;
@@ -125,7 +127,12 @@ export async function renderPlanner(container, members) {
       <div class="planner-day-meal">
         <select class="meal-select">
           <option value="">-- Select meal --</option>
-          ${recipes.map(r => `<option value="${escAttr(r.uid)}" ${dayData.recipeUid === r.uid ? 'selected' : ''}>${escHtml(r.name)}</option>`).join('')}
+          ${recipes.map(r => {
+            const isSelected = dayData.recipeUid === r.uid;
+            const isUsedElsewhere = !isSelected && assignedThisWeek.has(r.uid);
+            const label = isUsedElsewhere ? `\u2713  ${r.name}` : r.name;
+            return `<option value="${escAttr(r.uid)}" ${isSelected ? 'selected' : ''}>${escHtml(label)}</option>`;
+          }).join('')}
         </select>
         <button class="suggest-btn">Re-suggest</button>
         <button class="clear-btn">Clear</button>
@@ -136,7 +143,10 @@ export async function renderPlanner(container, members) {
     `;
 
     // Auto-save on any change
-    const saveDay = () => saveDayData(weekKey, dayName, dayEl, members, plan);
+    const saveDay = () => {
+      saveDayData(weekKey, dayName, dayEl, members, plan);
+      refreshDropdownMarkers(container, plan, recipes);
+    };
 
     dayEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', saveDay));
     dayEl.querySelector('.meal-select').addEventListener('change', saveDay);
@@ -155,6 +165,7 @@ export async function renderPlanner(container, members) {
         plan.weekKey = weekKey;
         plan.updated = Date.now();
         await savePlan(weekKey, plan);
+        refreshDropdownMarkers(container, plan, recipes);
       }
     });
 
@@ -165,6 +176,25 @@ export async function renderPlanner(container, members) {
 
     container.appendChild(dayEl);
   }
+}
+
+function refreshDropdownMarkers(container, plan, recipes) {
+  const allAssigned = new Set();
+  for (const d of DAYS) {
+    if (plan.days[d]?.recipeUid) allAssigned.add(plan.days[d].recipeUid);
+  }
+
+  container.querySelectorAll('.planner-day').forEach(dayEl => {
+    const select = dayEl.querySelector('.meal-select');
+    const currentVal = select.value;
+    for (const opt of select.options) {
+      if (!opt.value) continue; // skip placeholder
+      const r = recipes.find(rec => rec.uid === opt.value);
+      if (!r) continue;
+      const isUsedElsewhere = opt.value !== currentVal && allAssigned.has(opt.value);
+      opt.textContent = isUsedElsewhere ? `\u2713  ${r.name}` : r.name;
+    }
+  });
 }
 
 function getDayDataFromEl(dayEl, members) {
