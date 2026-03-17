@@ -1118,6 +1118,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   margin-top: 0.5rem;
 }
 #import-preview.hidden { display: none; }
+#scan-preview.hidden { display: none; }
+#scan-status.hidden { display: none; }
+#scan-error.hidden { display: none; }
 #import-summary {
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
