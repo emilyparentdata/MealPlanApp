@@ -631,6 +631,16 @@ async function setupStarterPacksOnManage() {
 let pendingImport = [];
 
 function setupManagePage() {
+  // Add recipe tabs
+  document.querySelectorAll('.add-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.add-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.add-tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
   // Starter recipe packs
   setupStarterPacksOnManage();
 

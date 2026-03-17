@@ -225,103 +225,110 @@
     <section id="page-manage" class="page hidden">
       <h2>Manage Recipes</h2>
 
-      <!-- Starter Recipes -->
-      <div id="starter-recipe-section" class="manage-section">
-        <h3>Add Starter Recipes</h3>
-        <p class="section-help">Pick from curated recipe packs to get started quickly.</p>
-        <div id="manage-starter-packs"></div>
-        <button id="add-starter-btn" class="btn primary" style="margin-top:0.75rem">Add Selected Recipes</button>
-      </div>
-
-      <!-- Scan from Photo -->
-      <div id="scan-recipe-section" class="manage-section">
-        <h3>Scan a Recipe</h3>
-        <p class="section-help">Take a photo of a cookbook page or screenshot a recipe. We'll read it and add it for you.</p>
-        <div class="scan-controls">
-          <label class="btn file-upload-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:4px"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="2"/></svg>
-            Choose Photo
-            <input type="file" id="scan-file" accept="image/*" capture="environment" hidden>
-          </label>
-          <span id="scan-file-name" class="import-file-name">No photo chosen</span>
-        </div>
-        <div id="scan-preview" class="hidden">
-          <div id="scan-image-preview" style="margin-bottom:1rem;text-align:center;"></div>
-          <div id="scan-result"></div>
-          <div class="import-actions">
-            <button id="scan-save-btn" class="btn primary">Save This Recipe</button>
-            <button id="scan-edit-btn" class="btn">Edit First</button>
-            <button id="scan-cancel-btn" class="btn">Cancel</button>
-          </div>
-        </div>
-        <div id="scan-status" class="hidden" style="padding:1rem;text-align:center;color:var(--text-light);">
-          <div class="scan-spinner"></div>
-          Reading recipe from photo...
-        </div>
-        <div id="scan-error" class="hidden" style="color:#e53e3e;margin-top:0.75rem;"></div>
-      </div>
-
-      <!-- Import from URL -->
-      <div id="url-import-section" class="manage-section">
-        <h3>Add from URL</h3>
-        <p class="section-help">Paste a link to a recipe page. Works with most recipe blogs and sites.</p>
-        <div class="url-import-controls">
-          <input type="text" id="url-import-input" placeholder="https://www.example.com/recipe/...">
-          <button id="url-import-btn" class="btn primary">Fetch Recipe</button>
-        </div>
-        <div id="url-import-preview" class="hidden">
-          <div id="url-import-result"></div>
-          <div class="import-actions">
-            <button id="url-import-save-btn" class="btn primary">Save This Recipe</button>
-            <button id="url-import-cancel-btn" class="btn">Cancel</button>
-          </div>
-        </div>
-        <div id="url-import-error" class="hidden"></div>
-      </div>
-
-      <!-- Import Recipes -->
-      <div id="import-recipe-section" class="manage-section">
-        <h3>Import Recipes</h3>
-        <p class="section-help">Upload a JSON, CSV, or Paprika export file to import recipes in bulk.</p>
-        <div class="import-controls">
-          <label class="btn file-upload-btn">
-            Choose File
-            <input type="file" id="import-file" accept=".json,.csv,.paprikarecipes" hidden>
-          </label>
-          <span id="import-file-name" class="import-file-name">No file chosen</span>
-        </div>
-        <div id="import-preview" class="hidden">
-          <div id="import-summary"></div>
-          <div id="import-sample"></div>
-          <div class="import-actions">
-            <button id="import-confirm-btn" class="btn primary">Import All</button>
-            <button id="import-cancel-btn" class="btn">Cancel</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Add Single Recipe -->
-      <div id="add-recipe-form" class="manage-section">
-        <h3>Add a Recipe</h3>
-        <input type="text" id="new-recipe-name" placeholder="Recipe name" required>
-        <textarea id="new-recipe-ingredients" placeholder="Ingredients (one per line)"></textarea>
-        <textarea id="new-recipe-directions" placeholder="Directions"></textarea>
-        <div class="form-row">
-          <input type="text" id="new-recipe-servings" placeholder="Servings">
-          <input type="text" id="new-recipe-prep" placeholder="Prep time">
-          <input type="text" id="new-recipe-cook" placeholder="Cook time">
-        </div>
-        <input type="text" id="new-recipe-categories" placeholder="Categories (comma separated)">
-        <input type="text" id="new-recipe-source" placeholder="Source / URL">
-        <textarea id="new-recipe-notes" placeholder="Notes"></textarea>
-        <button id="save-recipe-btn" class="btn primary">Save Recipe</button>
-      </div>
-
-      <!-- Recipe List -->
+      <!-- Recipe List (top) -->
       <div id="manage-recipe-list-section" class="manage-section">
-        <h3>All Recipes <span id="manage-recipe-count"></span></h3>
+        <h3>Your Recipes <span id="manage-recipe-count"></span></h3>
         <input type="text" id="manage-search" placeholder="Search recipes...">
         <div id="manage-recipe-list"></div>
+      </div>
+
+      <!-- Add Recipes -->
+      <div class="manage-section">
+        <h3>Add Recipes</h3>
+        <div class="add-recipe-tabs">
+          <button class="add-tab active" data-tab="tab-scan">Scan Photo</button>
+          <button class="add-tab" data-tab="tab-url">From URL</button>
+          <button class="add-tab" data-tab="tab-manual">Manual</button>
+          <button class="add-tab" data-tab="tab-import">Import File</button>
+          <button class="add-tab" data-tab="tab-starters">Starter Packs</button>
+        </div>
+
+        <!-- Tab: Scan -->
+        <div id="tab-scan" class="add-tab-content active">
+          <p class="section-help">Take a photo of a cookbook page or screenshot a recipe. We'll read it and add it for you.</p>
+          <div class="scan-controls">
+            <label class="btn file-upload-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;margin-right:4px"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="2"/></svg>
+              Choose Photo
+              <input type="file" id="scan-file" accept="image/*" capture="environment" hidden>
+            </label>
+            <span id="scan-file-name" class="import-file-name">No photo chosen</span>
+          </div>
+          <div id="scan-preview" class="hidden">
+            <div id="scan-image-preview" style="margin-bottom:1rem;text-align:center;"></div>
+            <div id="scan-result"></div>
+            <div class="import-actions">
+              <button id="scan-save-btn" class="btn primary">Save This Recipe</button>
+              <button id="scan-edit-btn" class="btn">Edit First</button>
+              <button id="scan-cancel-btn" class="btn">Cancel</button>
+            </div>
+          </div>
+          <div id="scan-status" class="hidden" style="padding:1rem;text-align:center;color:var(--text-light);">
+            <div class="scan-spinner"></div>
+            Reading recipe from photo...
+          </div>
+          <div id="scan-error" class="hidden" style="color:#e53e3e;margin-top:0.75rem;"></div>
+        </div>
+
+        <!-- Tab: URL -->
+        <div id="tab-url" class="add-tab-content">
+          <p class="section-help">Paste a link to a recipe page. Works with most recipe blogs and sites.</p>
+          <div class="url-import-controls">
+            <input type="text" id="url-import-input" placeholder="https://www.example.com/recipe/...">
+            <button id="url-import-btn" class="btn primary">Fetch Recipe</button>
+          </div>
+          <div id="url-import-preview" class="hidden">
+            <div id="url-import-result"></div>
+            <div class="import-actions">
+              <button id="url-import-save-btn" class="btn primary">Save This Recipe</button>
+              <button id="url-import-cancel-btn" class="btn">Cancel</button>
+            </div>
+          </div>
+          <div id="url-import-error" class="hidden"></div>
+        </div>
+
+        <!-- Tab: Manual -->
+        <div id="tab-manual" class="add-tab-content">
+          <input type="text" id="new-recipe-name" placeholder="Recipe name" required>
+          <textarea id="new-recipe-ingredients" placeholder="Ingredients (one per line)"></textarea>
+          <textarea id="new-recipe-directions" placeholder="Directions"></textarea>
+          <div class="form-row">
+            <input type="text" id="new-recipe-servings" placeholder="Servings">
+            <input type="text" id="new-recipe-prep" placeholder="Prep time">
+            <input type="text" id="new-recipe-cook" placeholder="Cook time">
+          </div>
+          <input type="text" id="new-recipe-categories" placeholder="Categories (comma separated)">
+          <input type="text" id="new-recipe-source" placeholder="Source / URL">
+          <textarea id="new-recipe-notes" placeholder="Notes"></textarea>
+          <button id="save-recipe-btn" class="btn primary">Save Recipe</button>
+        </div>
+
+        <!-- Tab: Import -->
+        <div id="tab-import" class="add-tab-content">
+          <p class="section-help">Upload a JSON, CSV, or Paprika export file to import recipes in bulk.</p>
+          <div class="import-controls">
+            <label class="btn file-upload-btn">
+              Choose File
+              <input type="file" id="import-file" accept=".json,.csv,.paprikarecipes" hidden>
+            </label>
+            <span id="import-file-name" class="import-file-name">No file chosen</span>
+          </div>
+          <div id="import-preview" class="hidden">
+            <div id="import-summary"></div>
+            <div id="import-sample"></div>
+            <div class="import-actions">
+              <button id="import-confirm-btn" class="btn primary">Import All</button>
+              <button id="import-cancel-btn" class="btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Starters -->
+        <div id="tab-starters" class="add-tab-content">
+          <p class="section-help">Pick from curated recipe packs to get started quickly.</p>
+          <div id="manage-starter-packs"></div>
+          <button id="add-starter-btn" class="btn primary" style="margin-top:0.75rem">Add Selected Recipes</button>
+        </div>
       </div>
     </section>
   </main>
