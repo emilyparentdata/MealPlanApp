@@ -994,19 +994,33 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   line-height: 1.4;
 }
 
+#add-recipe-form label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 0.25rem;
+  margin-top: 0.75rem;
+}
+#add-recipe-form label:first-child {
+  margin-top: 0;
+}
 #add-recipe-form input,
 #add-recipe-form textarea {
   width: 100%;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
 }
 #add-recipe-form textarea {
-  min-height: 100px;
+  min-height: 120px;
   resize: vertical;
 }
 .form-row {
   display: flex;
   gap: 0.5rem;
+  margin-top: 0.75rem;
 }
+.form-row div { flex: 1; }
+.form-row label { margin-top: 0; }
 .form-row input { flex: 1; }
 
 /* URL Import */

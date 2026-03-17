@@ -282,18 +282,26 @@
 
         <!-- Tab: Manual -->
         <div id="tab-manual" class="add-tab-content">
-          <input type="text" id="new-recipe-name" placeholder="Recipe name" required>
-          <textarea id="new-recipe-ingredients" placeholder="Ingredients (one per line)"></textarea>
-          <textarea id="new-recipe-directions" placeholder="Directions"></textarea>
-          <div class="form-row">
-            <input type="text" id="new-recipe-servings" placeholder="Servings">
-            <input type="text" id="new-recipe-prep" placeholder="Prep time">
-            <input type="text" id="new-recipe-cook" placeholder="Cook time">
+          <div id="add-recipe-form">
+            <label>Recipe Name</label>
+            <input type="text" id="new-recipe-name" placeholder="e.g. Honey Salmon with Broccoli and Rice" required>
+            <label>Ingredients (one per line)</label>
+            <textarea id="new-recipe-ingredients" placeholder="2 salmon fillets&#10;1 head broccoli, chopped&#10;1 cup rice&#10;2 tbsp honey"></textarea>
+            <label>Directions</label>
+            <textarea id="new-recipe-directions" placeholder="1. Preheat oven to 400°F&#10;2. Mix honey glaze..."></textarea>
+            <div class="form-row">
+              <div><label>Servings</label><input type="text" id="new-recipe-servings" placeholder="e.g. 4"></div>
+              <div><label>Prep time</label><input type="text" id="new-recipe-prep" placeholder="e.g. 15 min"></div>
+              <div><label>Cook time</label><input type="text" id="new-recipe-cook" placeholder="e.g. 30 min"></div>
+            </div>
+            <label>Categories (comma separated)</label>
+            <input type="text" id="new-recipe-categories" placeholder="e.g. Seafood, Weeknight, Healthy">
+            <label>Source / URL</label>
+            <input type="text" id="new-recipe-source" placeholder="e.g. Grandma's cookbook, NYT Cooking">
+            <label>Notes</label>
+            <textarea id="new-recipe-notes" placeholder="Any extra notes..."></textarea>
+            <button id="save-recipe-btn" class="btn primary" style="margin-top:0.5rem">Save Recipe</button>
           </div>
-          <input type="text" id="new-recipe-categories" placeholder="Categories (comma separated)">
-          <input type="text" id="new-recipe-source" placeholder="Source / URL">
-          <textarea id="new-recipe-notes" placeholder="Notes"></textarea>
-          <button id="save-recipe-btn" class="btn primary">Save Recipe</button>
         </div>
 
         <!-- Tab: Import -->
