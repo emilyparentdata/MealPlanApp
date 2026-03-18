@@ -1080,16 +1080,14 @@ async function loadZipEntries(file) {
     if (compMethod === 0) {
       data = compressedData;
     } else if (compMethod === 8) {
-      // Deflate — wrap raw deflate in zlib framing so we can use
-      // 'deflate' mode (universally supported, unlike 'raw')
-      const zlibData = new Uint8Array(compressedData.length + 6);
-      zlibData[0] = 0x78; // zlib header
-      zlibData[1] = 0x9C;
-      zlibData.set(compressedData, 2);
-      // Adler-32 checksum placeholder (4 bytes at end) — browser ignores it
-      data = await decompressStream(zlibData, 'deflate');
+      // Deflate — the inner .paprikarecipe files are gzipped JSON,
+      // so we need to inflate the zip's deflate layer first.
+      // Use the uncompressed size from the central directory to
+      // allocate output, then inflate via tiny built-in inflater.
+      const uncompSize = view.getUint32(pos + 24, true);
+      data = inflateRaw(compressedData, uncompSize);
     } else {
-      data = compressedData; // unsupported method, try anyway
+      data = compressedData;
     }
 
     entries.push({ name, data });
@@ -1097,6 +1095,118 @@ async function loadZipEntries(file) {
   }
 
   return entries;
+}
+
+// Minimal raw deflate inflater (no dependencies, no DecompressionStream needed for zip layer)
+function inflateRaw(src, outSize) {
+  const out = new Uint8Array(outSize || src.length * 4);
+  let p = 0;  // src position (bit-level)
+  let op = 0; // output position
+
+  function bits(n) {
+    let v = 0;
+    for (let i = 0; i < n; i++) {
+      v |= ((src[p >> 3] >> (p & 7)) & 1) << i;
+      p++;
+    }
+    return v;
+  }
+
+  function huf(lengths) {
+    const max = Math.max(...lengths);
+    const counts = new Uint16Array(max + 1);
+    for (const l of lengths) if (l) counts[l]++;
+    const offsets = new Uint16Array(max + 1);
+    for (let i = 1; i <= max; i++) offsets[i] = offsets[i - 1] + counts[i - 1];
+    const table = new Uint16Array(lengths.length);
+    for (let i = 0; i < lengths.length; i++) {
+      if (lengths[i]) { table[offsets[lengths[i]]++] = i; }
+    }
+    return { counts, table, max };
+  }
+
+  function decode(h) {
+    let code = 0, first = 0, idx = 0;
+    for (let len = 1; len <= h.max; len++) {
+      code |= bits(1);
+      const count = h.counts[len];
+      if (code < first + count) return h.table[idx + (code - first)];
+      idx += count;
+      first = (first + count) << 1;
+      code <<= 1;
+    }
+    return -1;
+  }
+
+  const LENS_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+
+  // Fixed Huffman tables
+  const fixedLit = new Uint8Array(288);
+  for (let i = 0; i <= 143; i++) fixedLit[i] = 8;
+  for (let i = 144; i <= 255; i++) fixedLit[i] = 9;
+  for (let i = 256; i <= 279; i++) fixedLit[i] = 7;
+  for (let i = 280; i <= 287; i++) fixedLit[i] = 8;
+  const fixedDist = new Uint8Array(32).fill(5);
+
+  let bfinal = 0;
+  while (!bfinal) {
+    bfinal = bits(1);
+    const btype = bits(2);
+
+    if (btype === 0) {
+      // Stored
+      p = (p + 7) & ~7; // byte-align
+      const len = src[p >> 3] | (src[(p >> 3) + 1] << 8);
+      p += 32; // skip len and nlen
+      for (let i = 0; i < len; i++) out[op++] = src[p >> 3], p += 8;
+    } else {
+      let litH, distH;
+      if (btype === 1) {
+        litH = huf(fixedLit);
+        distH = huf(fixedDist);
+      } else {
+        const hlit = bits(5) + 257;
+        const hdist = bits(5) + 1;
+        const hclen = bits(4) + 4;
+        const clens = new Uint8Array(19);
+        for (let i = 0; i < hclen; i++) clens[LENS_ORDER[i]] = bits(3);
+        const clH = huf(clens);
+
+        const allLens = new Uint8Array(hlit + hdist);
+        let ai = 0;
+        while (ai < hlit + hdist) {
+          const sym = decode(clH);
+          if (sym < 16) { allLens[ai++] = sym; }
+          else if (sym === 16) { const r = bits(2) + 3; const v = allLens[ai - 1]; for (let j = 0; j < r; j++) allLens[ai++] = v; }
+          else if (sym === 17) { ai += bits(3) + 3; }
+          else { ai += bits(7) + 11; }
+        }
+        litH = huf(allLens.subarray(0, hlit));
+        distH = huf(allLens.subarray(hlit));
+      }
+
+      const lenBase = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+      const lenExtra = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+      const distBase = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+      const distExtra = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+
+      while (true) {
+        const sym = decode(litH);
+        if (sym === 256) break;
+        if (sym < 256) {
+          out[op++] = sym;
+        } else {
+          const li = sym - 257;
+          const length = lenBase[li] + bits(lenExtra[li]);
+          const di = decode(distH);
+          const dist = distBase[di] + bits(distExtra[di]);
+          for (let i = 0; i < length; i++) { out[op] = out[op - dist]; op++; }
+        }
+      }
+    }
+  }
+
+  return out.subarray(0, op);
 }
 
 async function decompressStream(data, format) {
