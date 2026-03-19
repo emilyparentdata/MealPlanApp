@@ -888,6 +888,9 @@ function setupUrlImport() {
 // === Photo Scan Import ===
 
 let pendingScanRecipe = null;
+let pendingBulkRecipes = [];
+
+const BULK_SCAN_LIMIT = 10;
 
 function setupScanImport() {
   const fileInput = document.getElementById('scan-file');
@@ -896,25 +899,48 @@ function setupScanImport() {
   const imagePreview = document.getElementById('scan-image-preview');
   const result = document.getElementById('scan-result');
   const status = document.getElementById('scan-status');
+  const statusText = document.getElementById('scan-status-text');
   const errorEl = document.getElementById('scan-error');
+  const bulkEl = document.getElementById('scan-bulk');
+  const bulkProgress = document.getElementById('scan-bulk-progress');
+  const bulkResults = document.getElementById('scan-bulk-results');
+  const bulkActions = document.getElementById('scan-bulk-actions');
 
   fileInput.addEventListener('change', async () => {
-    const file = fileInput.files[0];
-    if (!file) return;
+    const files = Array.from(fileInput.files);
+    if (!files.length) return;
 
-    fileNameEl.textContent = file.name;
     errorEl.classList.add('hidden');
     preview.classList.add('hidden');
+    bulkEl.classList.add('hidden');
+
+    if (files.length > BULK_SCAN_LIMIT) {
+      errorEl.textContent = `You can scan up to ${BULK_SCAN_LIMIT} photos at a time. You selected ${files.length}.`;
+      errorEl.classList.remove('hidden');
+      fileInput.value = '';
+      return;
+    }
+
+    // Single file — use original flow
+    if (files.length === 1) {
+      await scanSingleFile(files[0]);
+      return;
+    }
+
+    // Bulk flow
+    await scanBulkFiles(files);
+  });
+
+  async function scanSingleFile(file) {
+    fileNameEl.textContent = file.name;
+    statusText.textContent = 'Reading recipe from photo...';
     status.classList.remove('hidden');
 
-    // Show thumbnail
     const thumbUrl = URL.createObjectURL(file);
     imagePreview.innerHTML = `<img src="${thumbUrl}" class="scan-image-thumb" alt="Recipe photo">`;
 
     try {
-      // Read file as base64
       const base64 = await fileToBase64(file);
-
       const scanRecipe = firebase.functions().httpsCallable('scanRecipe');
       const response = await scanRecipe({
         imageBase64: base64,
@@ -922,7 +948,6 @@ function setupScanImport() {
       });
 
       const recipe = response.data;
-
       if (!recipe || !recipe.name) {
         throw new Error('Couldn\'t read a recipe from this image.');
       }
@@ -941,7 +966,6 @@ function setupScanImport() {
         rating: 0,
       };
 
-      // Show preview
       result.innerHTML = `
         <div class="url-recipe-preview">
           <h4>${escManage(recipe.name)}</h4>
@@ -956,15 +980,152 @@ function setupScanImport() {
       `;
       preview.classList.remove('hidden');
     } catch (err) {
-      const msg = err.message || 'Failed to scan recipe.';
-      errorEl.textContent = msg;
+      errorEl.textContent = err.message || 'Failed to scan recipe.';
       errorEl.classList.remove('hidden');
     } finally {
       status.classList.add('hidden');
     }
+  }
+
+  async function scanBulkFiles(files) {
+    fileNameEl.textContent = `${files.length} photos selected`;
+    pendingBulkRecipes = [];
+
+    // Show bulk UI with progress
+    bulkEl.classList.remove('hidden');
+    bulkActions.classList.add('hidden');
+    bulkResults.innerHTML = '';
+
+    // Build progress items
+    bulkProgress.innerHTML = files.map((f, i) =>
+      `<div class="scan-bulk-item" id="scan-bulk-item-${i}">
+        <span class="scan-bulk-status">pending</span>
+        <span class="scan-bulk-name">${escManage(f.name)}</span>
+      </div>`
+    ).join('');
+
+    const scanRecipe = firebase.functions().httpsCallable('scanRecipe');
+
+    for (let i = 0; i < files.length; i++) {
+      const itemEl = document.getElementById(`scan-bulk-item-${i}`);
+      const statusEl = itemEl.querySelector('.scan-bulk-status');
+      statusEl.textContent = 'scanning...';
+      statusEl.className = 'scan-bulk-status active';
+
+      try {
+        const base64 = await fileToBase64(files[i]);
+        const response = await scanRecipe({
+          imageBase64: base64,
+          mimeType: files[i].type || 'image/jpeg',
+        });
+
+        const recipe = response.data;
+        if (!recipe || !recipe.name) {
+          throw new Error('Couldn\'t read a recipe.');
+        }
+
+        const recipeObj = {
+          uid: 'scan_' + Date.now() + '_' + i,
+          name: recipe.name || '',
+          ingredients: recipe.ingredients || '',
+          directions: recipe.directions || '',
+          servings: recipe.servings || '',
+          prep_time: recipe.prep_time || '',
+          cook_time: recipe.cook_time || '',
+          categories: recipe.categories || [],
+          source: recipe.source || 'Photo scan',
+          notes: recipe.notes || '',
+          rating: 0,
+        };
+
+        pendingBulkRecipes.push(recipeObj);
+        statusEl.textContent = 'done';
+        statusEl.className = 'scan-bulk-status done';
+        itemEl.querySelector('.scan-bulk-name').textContent = escManage(recipe.name);
+      } catch (err) {
+        statusEl.textContent = 'failed';
+        statusEl.className = 'scan-bulk-status failed';
+      }
+    }
+
+    // Replace progress list with expandable review cards
+    bulkProgress.innerHTML = '';
+    if (pendingBulkRecipes.length > 0) {
+      bulkResults.innerHTML =
+        `<p class="scan-bulk-summary">${pendingBulkRecipes.length} of ${files.length} recipes read successfully. Review and edit below.</p>` +
+        pendingBulkRecipes.map((r, i) => renderBulkCard(r, i)).join('');
+      bulkActions.classList.remove('hidden');
+    } else {
+      bulkResults.innerHTML = `<p class="scan-bulk-summary">No recipes could be read from the selected photos.</p>`;
+    }
+  }
+
+  function renderBulkCard(recipe, idx) {
+    return `
+      <div class="scan-bulk-card" id="scan-bulk-card-${idx}">
+        <button class="scan-bulk-card-header" type="button" onclick="this.parentElement.classList.toggle('expanded')">
+          <span class="scan-bulk-card-title">${escManage(recipe.name)}</span>
+          <span class="scan-bulk-card-meta">
+            ${recipe.servings ? `Serves ${escManage(recipe.servings)}` : ''}
+          </span>
+          <span class="scan-bulk-card-chevron"></span>
+        </button>
+        <div class="scan-bulk-card-body">
+          <label>Name
+            <input type="text" class="bulk-field" data-idx="${idx}" data-field="name" value="${escAttr(recipe.name)}">
+          </label>
+          <label>Ingredients
+            <textarea class="bulk-field" data-idx="${idx}" data-field="ingredients" rows="4">${escManage(recipe.ingredients)}</textarea>
+          </label>
+          <label>Directions
+            <textarea class="bulk-field" data-idx="${idx}" data-field="directions" rows="4">${escManage(recipe.directions)}</textarea>
+          </label>
+          <div class="bulk-field-row">
+            <label>Servings
+              <input type="text" class="bulk-field" data-idx="${idx}" data-field="servings" value="${escAttr(recipe.servings)}">
+            </label>
+            <label>Prep Time
+              <input type="text" class="bulk-field" data-idx="${idx}" data-field="prep_time" value="${escAttr(recipe.prep_time)}">
+            </label>
+            <label>Cook Time
+              <input type="text" class="bulk-field" data-idx="${idx}" data-field="cook_time" value="${escAttr(recipe.cook_time)}">
+            </label>
+          </div>
+          <label>Notes
+            <textarea class="bulk-field" data-idx="${idx}" data-field="notes" rows="2">${escManage(recipe.notes)}</textarea>
+          </label>
+          <button class="btn scan-bulk-remove" type="button" onclick="removeBulkRecipe(${idx})">Remove</button>
+        </div>
+      </div>`;
+  }
+
+  // Sync edits back to pendingBulkRecipes
+  bulkResults.addEventListener('input', (e) => {
+    const field = e.target.dataset && e.target.dataset.field;
+    const idx = e.target.dataset && e.target.dataset.idx;
+    if (field && idx != null && pendingBulkRecipes[idx]) {
+      pendingBulkRecipes[idx][field] = e.target.value;
+      // Update card header title when name changes
+      if (field === 'name') {
+        const card = document.getElementById(`scan-bulk-card-${idx}`);
+        if (card) card.querySelector('.scan-bulk-card-title').textContent = e.target.value;
+      }
+    }
   });
 
-  // Save directly
+  // Expose remove function globally (called from onclick)
+  window.removeBulkRecipe = function(idx) {
+    pendingBulkRecipes[idx] = null;
+    const card = document.getElementById(`scan-bulk-card-${idx}`);
+    if (card) card.remove();
+    const remaining = pendingBulkRecipes.filter(Boolean);
+    if (remaining.length === 0) {
+      bulkActions.classList.add('hidden');
+      bulkResults.innerHTML = `<p class="scan-bulk-summary">All recipes removed.</p>`;
+    }
+  };
+
+  // Save directly (single)
   document.getElementById('scan-save-btn').addEventListener('click', async () => {
     if (!pendingScanRecipe) return;
     await saveRecipeToFirebase(pendingScanRecipe);
@@ -975,7 +1136,7 @@ function setupScanImport() {
     resetScan();
   });
 
-  // Edit first — pre-fill the manual form
+  // Edit first — pre-fill the manual form (single only)
   document.getElementById('scan-edit-btn').addEventListener('click', () => {
     if (!pendingScanRecipe) return;
     document.getElementById('new-recipe-name').value = pendingScanRecipe.name || '';
@@ -987,16 +1148,45 @@ function setupScanImport() {
     document.getElementById('add-recipe-form').scrollIntoView({ behavior: 'smooth' });
   });
 
-  // Cancel
+  // Cancel (single)
   document.getElementById('scan-cancel-btn').addEventListener('click', resetScan);
+
+  // Save all (bulk) — skip removed (null) entries
+  document.getElementById('scan-bulk-save-btn').addEventListener('click', async () => {
+    const toSave = pendingBulkRecipes.filter(Boolean);
+    if (!toSave.length) return;
+    const btn = document.getElementById('scan-bulk-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    for (const recipe of toSave) {
+      await saveRecipeToFirebase(recipe);
+    }
+
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    refreshManageRecipeList();
+    showToast(`${toSave.length} recipe${toSave.length === 1 ? '' : 's'} saved!`);
+    resetScan();
+  });
+
+  // Cancel (bulk)
+  document.getElementById('scan-bulk-cancel-btn').addEventListener('click', resetScan);
 
   function resetScan() {
     pendingScanRecipe = null;
+    pendingBulkRecipes = [];
     fileInput.value = '';
-    fileNameEl.textContent = 'No photo chosen';
+    fileNameEl.textContent = 'No photos chosen';
     preview.classList.add('hidden');
     imagePreview.innerHTML = '';
     errorEl.classList.add('hidden');
+    bulkEl.classList.add('hidden');
+    bulkProgress.innerHTML = '';
+    bulkResults.innerHTML = '';
+    const btn = document.getElementById('scan-bulk-save-btn');
+    btn.disabled = false;
+    btn.textContent = 'Save All Recipes';
   }
 }
 
@@ -1382,6 +1572,10 @@ function escManage(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+
+function escAttr(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // === Edit Recipe Modal ===
