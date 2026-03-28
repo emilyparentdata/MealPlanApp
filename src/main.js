@@ -1,10 +1,9 @@
 import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes } from './firebase.js';
-import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
-import { initPreferences, renderPreferenceList, getAllPreferences, toggleFavorite } from './preferences.js';
+import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes, buildStatusSummary } from './recipes.js';
+import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, getRecipePrefs } from './preferences.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
-import { renderFeedbackPage } from './feedback.js';
 
 // === State ===
 const BETA_CODE = 'MEALS2026';
@@ -62,14 +61,12 @@ async function initApp(household) {
   // Get members from household
   members = await getHouseholdMembers();
   setupNavigation();
-  setupRecipesPage();
-  setupPreferencesPage();
   setupPlannerPage();
   setupPlanViewPage();
   setupGroceryPage();
   setupManagePage();
+  setupFeedbackModal();
 
-  setupHomePage();
   setupSignOut();
   setupEditModal();
 
@@ -88,7 +85,7 @@ async function initApp(household) {
     });
   }
 
-  showPage('home');
+  showPage('plan-view');
   appInitialized = true;
 }
 
@@ -226,10 +223,6 @@ function getSelectedStarterRecipes(containerSelector, existingRecipeUids) {
 }
 
 function setupHouseholdPage() {
-  ensureStarterPackData().then(() => {
-    renderStarterPackOptions(document.getElementById('starter-pack-options'), new Set());
-  });
-
   document.getElementById('create-household-btn').addEventListener('click', async () => {
     const name = document.getElementById('household-name').value.trim();
     const membersStr = document.getElementById('household-members').value.trim();
@@ -246,14 +239,7 @@ function setupHouseholdPage() {
     }
     try {
       const { inviteCode } = await createHousehold(name, memberNames);
-
-      // Import selected starter pack recipes
-      const starterRecipes = getSelectedStarterRecipes('#starter-pack-options', new Set());
-      if (starterRecipes.length) {
-        await bulkSaveRecipes(starterRecipes);
-      }
-
-      showToast(`Household created with ${starterRecipes.length} starter recipes! Invite code: ${inviteCode}`);
+      showToast(`Household created! Invite code: ${inviteCode}`);
       const household = await getHouseholdInfo();
       const user = (await import('./firebase.js')).getCurrentUser();
       await showApp(user, household);
@@ -301,7 +287,16 @@ function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => showPage(btn.dataset.page));
   });
-  document.getElementById('home-link').addEventListener('click', () => showPage('home'));
+  document.getElementById('home-link').addEventListener('click', () => showPage('plan-view'));
+
+  // Global navigation handler for [data-navigate] links/buttons in empty states etc.
+  document.addEventListener('click', (e) => {
+    const navEl = e.target.closest('[data-navigate]');
+    if (navEl) {
+      e.preventDefault();
+      showPage(navEl.dataset.navigate);
+    }
+  });
 }
 
 function showPage(pageId) {
@@ -319,67 +314,13 @@ function showPage(pageId) {
   });
 
   // Refresh page content on show
-  if (pageId === 'recipes') refreshRecipes();
-  if (pageId === 'preferences') refreshPreferences();
   if (pageId === 'planner') refreshPlanner();
   if (pageId === 'plan-view') refreshPlanView();
   if (pageId === 'grocery') refreshGrocery();
-  if (pageId === 'feedback') refreshFeedback();
   if (pageId === 'manage') refreshManageRecipeList();
 }
 
 
-// === Home Page ===
-function setupHomePage() {
-  document.querySelectorAll('.home-card').forEach(card => {
-    card.addEventListener('click', () => showPage(card.dataset.page));
-  });
-}
-
-// === Recipes Page ===
-function setupRecipesPage() {
-  const search = document.getElementById('recipe-search');
-  search.addEventListener('input', () => refreshRecipes());
-
-  document.querySelector('.modal-close').addEventListener('click', () => {
-    document.getElementById('recipe-modal').classList.add('hidden');
-  });
-  document.getElementById('recipe-modal').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
-  });
-}
-
-function refreshRecipes() {
-  const query = document.getElementById('recipe-search').value;
-  const recipes = filterRecipes(query);
-  const prefs = getAllPreferences();
-  renderRecipeList(document.getElementById('recipe-list'), recipes, (recipe) => {
-    currentDetailRecipe = recipe;
-    renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
-    document.getElementById('recipe-modal').classList.remove('hidden');
-  }, prefs, {
-    onToggleFavorite: async (recipeUid) => {
-      return await toggleFavorite(recipeUid);
-    }
-  });
-}
-
-// === Preferences Page ===
-function setupPreferencesPage() {
-  document.getElementById('pref-search').addEventListener('input', () => refreshPreferences());
-  document.getElementById('pref-filter-unrated').addEventListener('change', () => refreshPreferences());
-}
-
-function refreshPreferences() {
-  const query = document.getElementById('pref-search').value;
-  const unratedOnly = document.getElementById('pref-filter-unrated').checked;
-  renderPreferenceList(
-    document.getElementById('pref-list'),
-    getRecipes(),
-    query,
-    unratedOnly
-  );
-}
 
 // === Planner Page ===
 function setupPlannerPage() {
@@ -435,7 +376,17 @@ async function updateCommitStatus(weekKey) {
 function refreshPlanner() {
   const weekKey = getWeekKey();
   document.getElementById('week-label').textContent = getWeekLabel();
-  renderPlanner(document.getElementById('planner-grid'), members);
+  const grid = document.getElementById('planner-grid');
+  if (getRecipes().length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state-card">
+        <p>Add some recipes first to start planning meals.</p>
+        <button class="btn primary" data-navigate="manage">Add Recipes</button>
+      </div>
+    `;
+    return;
+  }
+  renderPlanner(grid, members);
   updateCommitStatus(weekKey);
 }
 
@@ -475,6 +426,28 @@ function setupPlanViewPage() {
 }
 
 function refreshPlanView() {
+  // Welcome card for new users with zero recipes
+  const welcomeEl = document.getElementById('plan-view-welcome');
+  if (getRecipes().length === 0) {
+    welcomeEl.innerHTML = `
+      <div class="welcome-card">
+        <h3>Welcome to Meal Plan!</h3>
+        <p>Here's how it works:</p>
+        <div class="welcome-steps">
+          <div class="welcome-step"><span class="welcome-step-num">1</span> Add your family's recipes</div>
+          <div class="welcome-step"><span class="welcome-step-num">2</span> Plan your week</div>
+          <div class="welcome-step"><span class="welcome-step-num">3</span> Get your grocery list</div>
+        </div>
+        <div class="welcome-actions">
+          <button class="btn primary" data-navigate="manage">Add Your First Recipes</button>
+          <a href="guide.html" target="_blank" class="btn">Learn More</a>
+        </div>
+      </div>
+    `;
+  } else {
+    welcomeEl.innerHTML = '';
+  }
+
   renderPlanView(
     document.getElementById('plan-view-grid'),
     document.getElementById('view-week-label'),
@@ -484,6 +457,9 @@ function refreshPlanView() {
       currentDetailRecipe = recipe;
       renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
       document.getElementById('recipe-modal').classList.remove('hidden');
+    },
+    (recipe) => {
+      openFeedbackModal(recipe);
     }
   );
 }
@@ -571,18 +547,107 @@ function refreshGrocery() {
   );
 }
 
-// === Feedback Page ===
-function refreshFeedback() {
-  renderFeedbackPage(document.getElementById('feedback-list'));
+// === Inline Preference Controls (used in Manage Recipes + Feedback Modal) ===
+
+function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete } = {}) {
+  const prefs = getRecipePrefs(recipeUid);
+  const el = document.createElement('div');
+  el.className = 'inline-pref-controls';
+
+  const favActive = prefs.favorite ? ' active' : '';
+
+  // Top row: Favorite, Edit, Delete
+  let topButtons = `<button class="pref-flag-btn fav-flag-btn${favActive}">${prefs.favorite ? '\u2764' : '\u2661'} Favorite</button>`;
+  if (onEdit) topButtons += `<button class="btn edit-btn">Edit</button>`;
+  if (onDelete) topButtons += `<button class="btn delete-btn">Delete</button>`;
+
+  // Bottom row: Won't eat + Make ahead
+  const doesntEatHtml = members.map(m => {
+    const active = (prefs.doesntEat || []).includes(m) ? ' active' : '';
+    return `<button class="pref-member-btn${active}" data-member="${escAttr(m)}">${escManage(m)}</button>`;
+  }).join('');
+  const makeAheadActive = prefs.makeAhead ? ' active' : '';
+
+  el.innerHTML = `
+    <div class="pref-row-inline pref-top-actions">${topButtons}</div>
+    <div class="pref-row-inline">
+      <span class="pref-label">Won't eat:</span>
+      <div class="pref-member-btns">${doesntEatHtml}</div>
+      <button class="pref-flag-btn make-ahead-btn${makeAheadActive}">Make Ahead</button>
+    </div>
+  `;
+
+  // Wire favorite
+  el.querySelector('.fav-flag-btn').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const nowFav = await toggleFavorite(recipeUid);
+    e.target.classList.toggle('active', nowFav);
+    e.target.textContent = (nowFav ? '\u2764' : '\u2661') + ' Favorite';
+    if (onUpdate) onUpdate();
+  });
+
+  // Wire edit/delete if provided
+  if (onEdit) {
+    el.querySelector('.edit-btn').addEventListener('click', (e) => { e.stopPropagation(); onEdit(); });
+  }
+  if (onDelete) {
+    el.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); onDelete(); });
+  }
+
+  // Wire doesntEat buttons
+  el.querySelectorAll('.pref-member-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await toggleDoesntEat(recipeUid, btn.dataset.member);
+      btn.classList.toggle('active');
+      if (onUpdate) onUpdate();
+    });
+  });
+
+  // Wire make-ahead
+  el.querySelector('.make-ahead-btn').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await toggleMakeAhead(recipeUid);
+    e.target.classList.toggle('active');
+    if (onUpdate) onUpdate();
+  });
+
+  return el;
+}
+
+// === Feedback Modal ===
+
+function setupFeedbackModal() {
+  document.querySelector('.feedback-modal-close').addEventListener('click', () => {
+    document.getElementById('feedback-modal').classList.add('hidden');
+  });
+  document.getElementById('feedback-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+  });
+
+  // Also set up recipe detail modal close (was in setupRecipesPage)
+  document.querySelector('.modal-close').addEventListener('click', () => {
+    document.getElementById('recipe-modal').classList.add('hidden');
+  });
+  document.getElementById('recipe-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+  });
+}
+
+function openFeedbackModal(recipe) {
+  const modal = document.getElementById('feedback-modal');
+  document.getElementById('feedback-modal-title').textContent = recipe.name;
+  const body = document.getElementById('feedback-modal-body');
+  body.innerHTML = '';
+  body.appendChild(buildInlinePreferenceControls(recipe.uid));
+  modal.classList.remove('hidden');
 }
 
 // === Starter Packs on Manage Page ===
 async function setupStarterPacksOnManage() {
   await ensureStarterPackData();
   const container = document.getElementById('manage-starter-packs');
-  const section = document.getElementById('starter-recipe-section');
   if (!starterPackData) {
-    section.style.display = 'none';
     return;
   }
 
@@ -594,7 +659,6 @@ async function setupStarterPacksOnManage() {
     pack.recipes.every(r => existingUids.has(r.uid))
   );
   if (allAdded) {
-    section.querySelector('.section-help').textContent = 'All starter recipes have been added!';
     document.getElementById('add-starter-btn').style.display = 'none';
     return;
   }
@@ -631,7 +695,15 @@ async function setupStarterPacksOnManage() {
 let pendingImport = [];
 
 function setupManagePage() {
-  // Toggle recipe list
+  // Toggle "Add Recipes" section
+  document.getElementById('toggle-add-recipes').addEventListener('click', () => {
+    const btn = document.getElementById('toggle-add-recipes');
+    const body = document.getElementById('add-recipes-body');
+    btn.classList.toggle('open');
+    body.classList.toggle('hidden');
+  });
+
+  // Toggle "Your Recipes" section
   document.getElementById('toggle-recipe-list').addEventListener('click', () => {
     const btn = document.getElementById('toggle-recipe-list');
     const body = document.getElementById('recipe-list-body');
@@ -698,6 +770,17 @@ function setupManagePage() {
   });
 
   document.getElementById('manage-search').addEventListener('input', () => refreshManageRecipeList());
+
+  // Export all recipes
+  document.getElementById('export-all-btn').addEventListener('click', () => {
+    const recipes = getRecipes();
+    if (!recipes.length) {
+      showToast('No recipes to export.');
+      return;
+    }
+    exportRecipesToFile(recipes, 'my-recipes.json');
+    showToast(`Exported ${recipes.length} recipes!`);
+  });
 
   // Import file handling
   const fileInput = document.getElementById('import-file');
@@ -1529,43 +1612,58 @@ function showImportPreview(recipes) {
 
 function refreshManageRecipeList() {
   const container = document.getElementById('manage-recipe-list');
-  const query = document.getElementById('manage-search').value.toLowerCase().trim();
-  let recipes = getRecipes();
+  const query = document.getElementById('manage-search').value;
+  const recipes = filterRecipes(query);
+  const prefs = getAllPreferences();
 
-  document.getElementById('manage-recipe-count').textContent = `(${recipes.length})`;
+  document.getElementById('manage-recipe-count').textContent = `(${getRecipes().length})`;
 
-  if (query) {
-    recipes = recipes.filter(r =>
-      r.name.toLowerCase().includes(query) ||
-      (r.categories || []).some(c => c.toLowerCase().includes(query))
-    );
-  }
+  renderRecipeList(container, recipes, (recipe) => {
+    currentDetailRecipe = recipe;
+    renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
+    document.getElementById('recipe-modal').classList.remove('hidden');
+  }, prefs, {
+    onToggleFavorite: async (recipeUid) => {
+      const nowFav = await toggleFavorite(recipeUid);
+      // Update status chips on the card
+      const card = container.querySelector(`[data-uid="${recipeUid}"]`);
+      if (card) {
+        const statusEl = card.querySelector('.recipe-status');
+        const newHtml = buildStatusSummary(recipeUid, getAllPreferences());
+        if (statusEl) statusEl.outerHTML = newHtml || '<div class="recipe-status"></div>';
+      }
+      return nowFav;
+    },
+    onRenderCard: (card, recipe) => {
+      const refreshStatus = () => {
+        const statusEl = card.querySelector('.recipe-status');
+        const newHtml = buildStatusSummary(recipe.uid, getAllPreferences());
+        if (statusEl) statusEl.outerHTML = newHtml || '<div class="recipe-status"></div>';
+        else {
+          const cats = card.querySelector('.recipe-categories');
+          if (cats) cats.insertAdjacentHTML('beforebegin', newHtml);
+        }
+      };
 
-  container.innerHTML = '';
-  if (!recipes.length) {
-    container.innerHTML = '<p class="section-help">No recipes yet. Import a file or add one above.</p>';
-    return;
-  }
-  for (const r of recipes) {
-    const row = document.createElement('div');
-    row.className = 'manage-recipe-row';
-    row.innerHTML = `
-      <span class="manage-recipe-name">${escManage(r.name)}</span>
-      <span class="manage-recipe-cats">${(r.categories || []).join(', ')}</span>
-      <button class="btn edit-btn">Edit</button>
-      <button class="btn delete-btn">Delete</button>
-    `;
-    row.querySelector('.edit-btn').addEventListener('click', () => openEditModal(r));
-    row.querySelector('.delete-btn').addEventListener('click', async () => {
-      if (!await confirmDelete(r.name)) return;
-      await archiveRecipe(r.uid);
-      await loadHouseholdRecipes();
-      await loadRecipes();
-      refreshManageRecipeList();
-      showToast(`"${r.name}" deleted.`);
-    });
-    container.appendChild(row);
-  }
+      const prefControls = buildInlinePreferenceControls(recipe.uid, {
+        onUpdate: refreshStatus,
+        onEdit: () => openEditModal(recipe),
+        onDelete: async () => {
+          if (!await confirmDelete(recipe.name)) return;
+          await archiveRecipe(recipe.uid);
+          await loadHouseholdRecipes();
+          await loadRecipes();
+          refreshManageRecipeList();
+          showToast(`"${recipe.name}" deleted.`);
+        }
+      });
+
+      // Insert before categories
+      const cats = card.querySelector('.recipe-categories');
+      if (cats) card.insertBefore(prefControls, cats);
+      else card.appendChild(prefControls);
+    }
+  });
 }
 
 function escManage(str) {
@@ -1640,6 +1738,14 @@ function setupEditModal() {
     document.getElementById('recipe-modal').classList.add('hidden');
     openEditModal(currentDetailRecipe);
   });
+
+  // Export from detail modal
+  document.getElementById('export-from-detail-btn').addEventListener('click', () => {
+    if (!currentDetailRecipe) return;
+    const safeName = currentDetailRecipe.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    exportRecipesToFile([currentDetailRecipe], `${safeName}.json`);
+    showToast(`"${currentDetailRecipe.name}" exported!`);
+  });
 }
 
 function openEditModal(recipe) {
@@ -1688,6 +1794,36 @@ function confirmDelete(recipeName) {
     noBtn.addEventListener('click', onNo);
     modal.addEventListener('click', onBackdrop);
   });
+}
+
+// === Export Recipes ===
+function exportRecipesToFile(recipes, filename) {
+  const exportData = recipes.map(r => ({
+    name: r.name,
+    ingredients: r.ingredients,
+    directions: r.directions,
+    servings: r.servings,
+    prep_time: r.prep_time,
+    cook_time: r.cook_time,
+    total_time: r.total_time,
+    categories: r.categories,
+    source: r.source,
+    source_url: r.source_url,
+    description: r.description,
+    notes: r.notes,
+    image_url: r.image_url,
+  }));
+
+  const json = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // === Toast ===

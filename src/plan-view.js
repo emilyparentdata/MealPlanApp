@@ -4,7 +4,7 @@ import { getWeekKey, getWeekLabel } from './planner.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride, weekLabelOverride, onMealClick) {
+export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride, weekLabelOverride, onMealClick, onFeedbackClick) {
   const weekKey = weekKeyOverride || getWeekKey();
   weekLabelEl.textContent = weekLabelOverride || getWeekLabel();
 
@@ -12,7 +12,12 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
   gridContainer.innerHTML = '';
 
   if (!plan || !plan.days) {
-    gridContainer.innerHTML = '<p style="color:var(--text-light);padding:2rem;">No committed plan for this week. Go to "Plan Week", set it up, and hit "Commit This Plan".</p>';
+    gridContainer.innerHTML = `
+      <div class="empty-state-card">
+        <p>No meal plan for this week yet.</p>
+        <button class="btn primary" data-navigate="planner">Plan This Week</button>
+      </div>
+    `;
     return;
   }
 
@@ -25,10 +30,13 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
     const dayData = plan.days[dayName] || {};
 
     const card = document.createElement('div');
-    card.className = `plan-day-card${dayData.skip ? ' skip' : ''}`;
+    const isSkip = dayData.skip === true || dayData.skip === 'skip';
+    const isLeftovers = dayData.skip === 'leftovers';
+    card.className = `plan-day-card${isSkip ? ' skip' : ''}${isLeftovers ? ' leftovers' : ''}`;
 
     const recipe = dayData.recipeUid ? getRecipeByUid(dayData.recipeUid) : null;
-    const mealName = dayData.skip ? 'Skipped'
+    const mealName = isSkip ? 'Skipped'
+      : isLeftovers ? 'Leftovers'
       : (recipe ? recipe.name : 'No meal planned');
 
     const flags = [];
@@ -42,7 +50,18 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
       <div class="meal-flags">
         ${flags.map(f => `<span class="flag-chip">${f}</span>`).join('')}
       </div>
+      ${recipe ? '<button class="feedback-btn">Feedback</button>' : ''}
     `;
+
+    if (recipe && onFeedbackClick) {
+      const fbBtn = card.querySelector('.feedback-btn');
+      if (fbBtn) {
+        fbBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          onFeedbackClick(recipe, dayData);
+        });
+      }
+    }
 
     if (recipe && onMealClick) {
       const nameEl = card.querySelector('.meal-name');

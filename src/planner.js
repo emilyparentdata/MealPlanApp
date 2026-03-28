@@ -122,7 +122,11 @@ export async function renderPlanner(container, members) {
           `).join('')}
         </div>
         <label><input type="checkbox" class="make-ahead" ${dayData.makeAhead ? 'checked' : ''}> Make ahead</label>
-        <label><input type="checkbox" class="skip-day" ${dayData.skip ? 'checked' : ''}> Skip</label>
+        <select class="day-status-select">
+          <option value="">Cooking</option>
+          <option value="skip" ${dayData.skip === true || dayData.skip === 'skip' ? 'selected' : ''}>Skip</option>
+          <option value="leftovers" ${dayData.skip === 'leftovers' ? 'selected' : ''}>Leftovers</option>
+        </select>
       </div>
       <div class="planner-day-meal">
         <select class="meal-select">
@@ -139,6 +143,13 @@ export async function renderPlanner(container, members) {
       </div>
       <div class="planner-day-sides">
         <input type="text" class="sides-input" placeholder="Sides (e.g. rice, salad, bread)" value="${escAttr(dayData.sides || '')}">
+        <select class="servings-select" title="Recipe multiplier">
+          <option value="0.5" ${dayData.servings === 0.5 ? 'selected' : ''}>&frac12;x</option>
+          <option value="1" ${!dayData.servings || dayData.servings === 1 ? 'selected' : ''}>1x</option>
+          <option value="1.5" ${dayData.servings === 1.5 ? 'selected' : ''}>1&frac12;x</option>
+          <option value="2" ${dayData.servings === 2 ? 'selected' : ''}>2x</option>
+          <option value="3" ${dayData.servings === 3 ? 'selected' : ''}>3x</option>
+        </select>
       </div>
     `;
 
@@ -150,7 +161,9 @@ export async function renderPlanner(container, members) {
 
     dayEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', saveDay));
     dayEl.querySelector('.meal-select').addEventListener('change', saveDay);
+    dayEl.querySelector('.day-status-select').addEventListener('change', saveDay);
     dayEl.querySelector('.sides-input').addEventListener('change', saveDay);
+    dayEl.querySelector('.servings-select').addEventListener('change', saveDay);
 
     // Single-day re-suggest
     dayEl.querySelector('.suggest-btn').addEventListener('click', async () => {
@@ -205,9 +218,10 @@ function getDayDataFromEl(dayEl, members) {
   return {
     whoHome,
     makeAhead: dayEl.querySelector('.make-ahead')?.checked || false,
-    skip: dayEl.querySelector('.skip-day')?.checked || false,
+    skip: dayEl.querySelector('.day-status-select')?.value || false,
     recipeUid: dayEl.querySelector('.meal-select')?.value || '',
     sides: dayEl.querySelector('.sides-input')?.value || '',
+    servings: parseFloat(dayEl.querySelector('.servings-select')?.value) || 1,
   };
 }
 
@@ -247,7 +261,7 @@ function collectAssignedProteins(plan, excludeDay) {
 
 function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins) {
   const dayData = getDayDataFromEl(dayEl, members);
-  if (dayData.skip) return null;
+  if (dayData.skip === true || dayData.skip === 'skip' || dayData.skip === 'leftovers') return null;
 
   const recipes = getRecipes();
   const prefs = getAllPreferences();
@@ -315,7 +329,7 @@ export async function suggestAllMeals(container, members) {
     const dayEl = dayEls[i];
     const dayName = DAYS[i];
     const currentMeal = dayEl.querySelector('.meal-select').value;
-    const isSkip = dayEl.querySelector('.skip-day')?.checked;
+    const isSkip = dayEl.querySelector('.day-status-select')?.value;
 
     if (!currentMeal && !isSkip) {
       const assignedThisWeek = collectAssignedThisWeek(plan, dayName);

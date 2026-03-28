@@ -43,10 +43,6 @@
         <h3>Create a Household</h3>
         <input type="text" id="household-name" placeholder="Household name (e.g. The Smiths)">
         <input type="text" id="household-members" placeholder="Family members (comma separated)">
-        <div id="starter-packs" class="starter-packs">
-          <p class="starter-packs-label">Start with some recipes? (optional)</p>
-          <div id="starter-pack-options"></div>
-        </div>
         <button id="create-household-btn" class="btn primary login-btn">Create Household</button>
       </div>
 
@@ -69,15 +65,11 @@
     <h1 id="home-link" style="cursor:pointer">Dinner, Planned</h1>
     <p class="brand-byline">by <a href="https://www.parentdata.org" target="_blank">ParentData</a></p>
     <nav id="main-nav">
-      <button class="nav-btn active" data-page="home">Home</button>
-      <button class="nav-btn primary-nav" data-page="preferences">Rate Recipes</button>
-      <button class="nav-btn primary-nav" data-page="recipes">Recipes</button>
-      <button class="nav-btn primary-nav" data-page="plan-view">This Week</button>
+      <button class="nav-btn primary-nav active" data-page="plan-view">This Week</button>
+      <button class="nav-btn primary-nav" data-page="manage">Manage Recipes</button>
       <span class="nav-sep"></span>
       <button class="nav-btn" data-page="planner">Plan Week</button>
       <button class="nav-btn" data-page="grocery">Grocery List</button>
-      <button class="nav-btn" data-page="feedback">Feedback</button>
-      <button class="nav-btn" data-page="manage">Manage</button>
     </nav>
     <div id="user-info">
       <span id="user-display-name"></span>
@@ -87,68 +79,6 @@
   </header>
 
   <main>
-    <!-- Home Page -->
-    <section id="page-home" class="page active">
-      <div class="home-grid main-tiles">
-        <button class="home-card" data-page="preferences">
-          <span class="home-card-icon">&#11088;</span>
-          <span class="home-card-title">Rate Recipes</span>
-          <span class="home-card-desc">Mark who doesn't eat what, favorites, and make-ahead</span>
-        </button>
-        <button class="home-card" data-page="recipes">
-          <span class="home-card-icon">&#128214;</span>
-          <span class="home-card-title">Browse Recipes</span>
-          <span class="home-card-desc">Search and view all family recipes</span>
-        </button>
-        <button class="home-card" data-page="plan-view">
-          <span class="home-card-icon">&#128197;</span>
-          <span class="home-card-title">This Week's Plan</span>
-          <span class="home-card-desc">See what's for dinner and leave comments</span>
-        </button>
-      </div>
-      <p class="home-guide-link"><a href="guide.html" target="_blank">How does this work?</a></p>
-      <h3 class="home-section-label">Admin Tasks</h3>
-      <div class="home-grid admin-tiles">
-        <button class="home-card small" data-page="planner">
-          <span class="home-card-icon">&#129668;</span>
-          <span class="home-card-title">Plan the Week</span>
-        </button>
-        <button class="home-card small" data-page="grocery">
-          <span class="home-card-icon">&#128722;</span>
-          <span class="home-card-title">Grocery List</span>
-        </button>
-        <button class="home-card small" data-page="feedback">
-          <span class="home-card-icon">&#128172;</span>
-          <span class="home-card-title">Feedback</span>
-        </button>
-        <button class="home-card small" data-page="manage">
-          <span class="home-card-icon">&#9998;</span>
-          <span class="home-card-title">Manage Recipes</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- Recipes Page -->
-    <section id="page-recipes" class="page hidden">
-      <div class="page-header">
-        <h2>All Recipes</h2>
-        <input type="text" id="recipe-search" placeholder="Search recipes...">
-      </div>
-      <div id="recipe-list" class="recipe-grid"></div>
-    </section>
-
-    <!-- Preferences Page -->
-    <section id="page-preferences" class="page hidden">
-      <div class="page-header">
-        <h2>Rate Recipes</h2>
-        <input type="text" id="pref-search" placeholder="Search recipes...">
-        <div id="pref-filter-bar">
-          <label><input type="checkbox" id="pref-filter-unrated"> Show unset only</label>
-        </div>
-      </div>
-      <div id="pref-list"></div>
-    </section>
-
     <!-- Planner Page -->
     <section id="page-planner" class="page hidden">
       <div class="page-header">
@@ -170,7 +100,7 @@
     </section>
 
     <!-- This Week View -->
-    <section id="page-plan-view" class="page hidden">
+    <section id="page-plan-view" class="page active">
       <div class="page-header">
         <h2>Meal Plan</h2>
         <div class="week-selector">
@@ -179,6 +109,10 @@
           <button id="view-next-week">Next &raquo;</button>
         </div>
       </div>
+      <div class="plan-view-toolbar">
+        <a href="guide.html" target="_blank" class="btn guide-btn">How does this work?</a>
+      </div>
+      <div id="plan-view-welcome"></div>
       <div id="plan-view-grid"></div>
     </section>
 
@@ -212,28 +146,23 @@
       </details>
     </section>
 
-    <!-- Feedback Page -->
-    <section id="page-feedback" class="page hidden">
-      <div class="page-header">
-        <h2>Weekly Feedback</h2>
-      </div>
-      <p class="planner-instructions">Review last week's meals. Vote on each one to help the planner learn your family's preferences.</p>
-      <div id="feedback-list"></div>
-    </section>
-
     <!-- Manage Recipes Page -->
     <section id="page-manage" class="page hidden">
       <h2>Manage Recipes</h2>
 
-      <!-- Add Recipes -->
+      <!-- Add Recipes (open by default) -->
       <div class="manage-section">
-        <h3>Add Recipes</h3>
+        <button id="toggle-add-recipes" class="recipe-list-toggle open">
+          <span>Add Recipes</span>
+          <span class="toggle-arrow">&#9654;</span>
+        </button>
+        <div id="add-recipes-body" class="recipe-list-body">
         <div class="add-recipe-tabs">
           <button class="add-tab active" data-tab="tab-scan">Scan Photo</button>
           <button class="add-tab" data-tab="tab-url">From URL</button>
           <button class="add-tab" data-tab="tab-manual">Manual</button>
           <button class="add-tab" data-tab="tab-import">Import File</button>
-          <button class="add-tab" data-tab="tab-starters">Starter Packs</button>
+          <button class="add-tab" data-tab="tab-starters">Try Sample Recipes</button>
         </div>
 
         <!-- Tab: Scan -->
@@ -336,13 +265,14 @@
 
         <!-- Tab: Starters -->
         <div id="tab-starters" class="add-tab-content">
-          <p class="section-help">Pick from curated recipe packs to get started quickly.</p>
+          <p class="section-help">Want to try the app first? Load some sample recipes to see how meal planning works. You can always add your own later.</p>
           <div id="manage-starter-packs"></div>
           <button id="add-starter-btn" class="btn primary" style="margin-top:0.75rem">Add Selected Recipes</button>
         </div>
+        </div><!-- /add-recipes-body -->
       </div>
 
-      <!-- Your Recipes (collapsible) -->
+      <!-- Your Recipes (collapsible, collapsed by default) -->
       <div id="manage-recipe-list-section" class="manage-section">
         <button id="toggle-recipe-list" class="recipe-list-toggle">
           <span>Your Recipes <span id="manage-recipe-count"></span></span>
@@ -350,7 +280,8 @@
         </button>
         <div id="recipe-list-body" class="recipe-list-body hidden">
           <input type="text" id="manage-search" placeholder="Search recipes...">
-          <div id="manage-recipe-list"></div>
+          <div id="manage-recipe-list" class="recipe-grid"></div>
+          <button id="export-all-btn" class="btn" style="margin-top:1rem">Export All Recipes</button>
         </div>
       </div>
     </section>
@@ -362,7 +293,19 @@
     <div class="modal-content">
       <button class="modal-close">&times;</button>
       <div id="recipe-detail"></div>
-      <button id="edit-from-detail-btn" class="btn" style="margin-top:1rem">Edit Recipe</button>
+      <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button id="edit-from-detail-btn" class="btn">Edit Recipe</button>
+        <button id="export-from-detail-btn" class="btn">Export Recipe</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback Modal (per-meal on This Week) -->
+  <div id="feedback-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:480px;">
+      <button class="modal-close feedback-modal-close">&times;</button>
+      <h2 id="feedback-modal-title"></h2>
+      <div id="feedback-modal-body"></div>
     </div>
   </div>
 

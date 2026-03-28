@@ -107,12 +107,6 @@
       margin: 1rem 0;
       font-size: 0.9rem;
     }
-    code {
-      background: var(--bg);
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      font-size: 0.85em;
-    }
     .faq dt {
       font-weight: 600;
       margin-top: 1rem;
@@ -131,7 +125,7 @@
   <header>
     <h1>Dinner, Planned</h1>
     <p class="brand-byline">by <a href="https://www.parentdata.org" target="_blank">ParentData</a></p>
-    <p>Plan meals, rate recipes, and get dinner on the table together.</p>
+    <p>Plan meals, manage recipes, and get dinner on the table together.</p>
     <a href="index.html" class="back-link">&larr; Back to app</a>
   </header>
 
@@ -142,23 +136,18 @@
     <div class="step-grid">
       <div class="step-card">
         <span class="step-icon">&#128214;</span>
-        <span class="step-title">1. Add Recipes</span>
-        <span class="step-desc">Start with our curated packs, import from a file, paste a URL, or add your own.</span>
-      </div>
-      <div class="step-card">
-        <span class="step-icon">&#11088;</span>
-        <span class="step-title">2. Set Preferences</span>
-        <span class="step-desc">Mark who doesn't eat what, flag favorites, and note which meals work as make-ahead.</span>
+        <span class="step-title">1. Add Your Recipes</span>
+        <span class="step-desc">Snap a photo, paste a URL, or type them in. Set preferences like favorites and who won't eat what.</span>
       </div>
       <div class="step-card">
         <span class="step-icon">&#129668;</span>
-        <span class="step-title">3. Plan the Week</span>
+        <span class="step-title">2. Plan the Week</span>
         <span class="step-desc">Set who's home each night, then let the system suggest a varied menu.</span>
       </div>
       <div class="step-card">
-        <span class="step-icon">&#128197;</span>
-        <span class="step-title">4. Cook & Eat!</span>
-        <span class="step-desc">Everyone can see the week's plan and check ingredients for each meal.</span>
+        <span class="step-icon">&#128722;</span>
+        <span class="step-title">3. Shop & Cook!</span>
+        <span class="step-desc">Get an organized grocery list, see what's for dinner, and give feedback after meals.</span>
       </div>
     </div>
 
@@ -169,31 +158,34 @@
       <li>Go to the app and click <strong>Create Account</strong>.</li>
       <li>Enter your email, a password, and your <strong>beta access code</strong>.</li>
       <li>You'll be prompted to create a <strong>household</strong> &mdash; give it a name (e.g., "The Johnsons") and list your family members by first name.</li>
-      <li>Optionally pick from <strong>starter recipe packs</strong> to pre-load your household with 30 recipes.</li>
     </ol>
 
     <h3>Invite Your Partner</h3>
-    <p>Your household has an <strong>invite code</strong> &mdash; you'll see it in the top-right corner of the app. Click it to copy, then share it with your partner. They create their own account and enter the invite code on the household setup screen to join. You'll both see the same recipes, plans, and preferences.</p>
+    <p>Your household has an <strong>invite code</strong> &mdash; you'll see it in the top-right corner of the app. Click it to copy, then share it with your partner. They create their own account and enter the invite code on the household setup screen to join.</p>
 
     <div class="highlight">
       Each person logs in with their own email, but everyone in the household shares the same recipes and meal plans.
     </div>
 
-    <h2>Features</h2>
+    <h2>The App</h2>
+    <p>The app has four tabs: <strong>This Week</strong>, <strong>Manage Recipes</strong>, <strong>Plan Week</strong>, and <strong>Grocery List</strong>.</p>
 
     <div class="card">
-      <h3>&#128214; Browse Recipes</h3>
-      <p>Search and browse all your household's recipes. Click any recipe to see full details including ingredients, directions, and prep times. Favorites are marked with a heart.</p>
+      <h3>&#128197; This Week</h3>
+      <p>Your home screen. Shows the committed meal plan for the current week. Click any meal to see the full recipe. Use the <strong>Feedback</strong> button on each meal to mark favorites, flag who won't eat it, or set it as make-ahead &mdash; this helps the planner make better suggestions over time.</p>
     </div>
 
     <div class="card">
-      <h3>&#11088; Rate Recipes</h3>
-      <p>This is where your family sets preferences for each recipe:</p>
+      <h3>&#9998; Manage Recipes</h3>
+      <p>Add recipes to your household and manage your collection. You can:</p>
       <ul>
-        <li><strong>Doesn't eat</strong> &mdash; Tap a family member's name to mark that they won't eat this dish. The planner will automatically skip it on nights they're home.</li>
-        <li><strong>Favorite</strong> &mdash; Flag meals your family loves. Favorites get a boost when the planner suggests meals.</li>
-        <li><strong>Make-ahead</strong> &mdash; Mark recipes that can be prepped in advance. When you mark a day as "make ahead" in the planner, it will only suggest these recipes.</li>
+        <li><strong>Scan a photo</strong> &mdash; Take a picture of a cookbook page or screenshot and the app reads the recipe automatically.</li>
+        <li><strong>Paste a URL</strong> &mdash; Link to a recipe blog or site, and it pulls in the recipe.</li>
+        <li><strong>Type it in</strong> &mdash; Fill in the name, ingredients, and directions manually.</li>
+        <li><strong>Import a file</strong> &mdash; Upload a JSON, CSV, or Paprika export to bulk-import recipes.</li>
+        <li><strong>Try sample recipes</strong> &mdash; Load curated recipe packs to try the app before adding your own.</li>
       </ul>
+      <p>Each recipe card shows preferences at a glance. You can mark <strong>favorites</strong>, flag who <strong>won't eat</strong> a dish, set recipes as <strong>make-ahead</strong>, or <strong>edit</strong> and <strong>delete</strong> recipes.</p>
     </div>
 
     <div class="card">
@@ -201,45 +193,24 @@
       <p>The weekly planner lets you set up each day:</p>
       <ol>
         <li><strong>Set who's home</strong> &mdash; Check the family members who'll be eating that night.</li>
-        <li><strong>Mark special days</strong> &mdash; Flag days as "skip" (eating out, leftovers) or "make ahead."</li>
-        <li><strong>Suggest Meals</strong> &mdash; Hit the button and the system picks a balanced menu. It avoids repeating proteins, skips meals that someone at the table doesn't eat, and favors your favorites. You can also pick meals manually from the dropdown.</li>
-        <li><strong>Add sides</strong> &mdash; Optionally note side dishes for each meal.</li>
+        <li><strong>Mark special days</strong> &mdash; Set days as "skip" (eating out) or "leftovers" (no new cooking needed). Flag "make ahead" days for recipes that can be prepped in advance.</li>
+        <li><strong>Suggest Meals</strong> &mdash; Hit the button and the system picks a balanced menu. It avoids repeating proteins, skips meals that someone at the table doesn't eat, and favors your favorites.</li>
+        <li><strong>Add sides</strong> &mdash; Optionally note side dishes for each meal (these get added to your grocery list too).</li>
         <li><strong>Commit</strong> &mdash; When you're happy, hit "Commit This Plan" to publish it for the household.</li>
       </ol>
     </div>
 
     <div class="card">
-      <h3>&#128197; This Week's Plan</h3>
-      <p>A clean view of the committed meal plan for the current week (and past/future weeks). Everyone in the household sees the same plan.</p>
-    </div>
-
-    <div class="card">
-      <h3>&#128722; Meal Plan & Ingredients</h3>
-      <p>Shows each day's meal with its full ingredient list. Use this while grocery shopping or to prep for the week. You can copy the full list to your clipboard or email it.</p>
-    </div>
-
-    <div class="card">
-      <h3>&#128172; Feedback</h3>
-      <p>After meals are cooked, come here to give quick feedback. You can mark "doesn't eat" for family members, favorite a meal, or remove a recipe entirely if it didn't work out. Shows both the current and previous week.</p>
-    </div>
-
-    <div class="card">
-      <h3>&#9998; Manage Recipes</h3>
-      <p>Add recipes to your household in several ways:</p>
-      <ul>
-        <li><strong>Starter packs</strong> &mdash; Curated collections of family-friendly recipes to get you going.</li>
-        <li><strong>From a URL</strong> &mdash; Paste a link to a recipe blog or site, and the system will try to pull in the recipe automatically.</li>
-        <li><strong>Import a file</strong> &mdash; Upload a JSON or CSV file to bulk-import recipes.</li>
-        <li><strong>Add manually</strong> &mdash; Fill in the form with a name, ingredients, directions, and other details.</li>
-      </ul>
+      <h3>&#128722; Grocery List</h3>
+      <p>Automatically generated from your committed meal plan. Ingredients are organized by store section (Produce, Meat, Dairy, Pantry, Spices), combined across recipes, and cleaned up so you see what to buy &mdash; not recipe measurements. You can edit or remove any item, and add extra items like staples.</p>
     </div>
 
     <h2>How the Meal Suggester Works</h2>
-    <p>When you hit "Suggest Meals," the system scores every eligible recipe for each day. Here's what it considers:</p>
+    <p>When you hit "Suggest Meals," the system scores every eligible recipe for each day:</p>
     <ul>
-      <li><strong>Who's home</strong> &mdash; Recipes are excluded if anyone at the table has it marked as "doesn't eat."</li>
+      <li><strong>Who's home</strong> &mdash; Recipes are excluded if anyone at the table has it marked as "won't eat."</li>
       <li><strong>Make-ahead days</strong> &mdash; Only make-ahead-flagged recipes are suggested for these days.</li>
-      <li><strong>Protein variety</strong> &mdash; The system tracks proteins (chicken, beef, pork, seafood, pasta, etc.) used so far in the week and penalizes repeats.</li>
+      <li><strong>Protein variety</strong> &mdash; The system tracks proteins (chicken, beef, pork, seafood, tofu, pasta, etc.) and penalizes repeats within the week.</li>
       <li><strong>Recent history</strong> &mdash; Meals served in the last few weeks get a penalty to keep things fresh.</li>
       <li><strong>Favorites</strong> &mdash; Favorited recipes get a score boost.</li>
     </ul>
@@ -251,19 +222,19 @@
       <dd>Yes! Anyone in the household can edit the plan. The last person to "Commit" publishes the plan for everyone.</dd>
 
       <dt>What if I want to change a meal after committing?</dt>
-      <dd>Just go back to "Plan the Week," make your changes, and commit again. The new plan replaces the old one.</dd>
+      <dd>Just go back to "Plan Week," make your changes, and commit again. The new plan replaces the old one.</dd>
 
       <dt>Can I see past weeks?</dt>
-      <dd>Yes &mdash; the "This Week's Plan," "Plan the Week," and "Ingredients" pages all have previous/next week navigation.</dd>
+      <dd>Yes &mdash; This Week, Plan Week, and Grocery List all have previous/next week navigation.</dd>
 
-      <dt>How do I remove a recipe we don't like?</dt>
-      <dd>You can delete it from the Feedback page (click the remove button) or from the Manage page. Deleted recipes won't appear in future suggestions.</dd>
+      <dt>How do I remove a recipe?</dt>
+      <dd>Go to Manage Recipes, find the recipe, and click Delete. Deleted recipes won't appear in future suggestions.</dd>
 
       <dt>Is my data shared with other households?</dt>
       <dd>No. Each household's recipes, preferences, and meal plans are completely private.</dd>
 
       <dt>How do I invite more family members?</dt>
-      <dd>Click the invite code in the top-right corner of the app to copy it. Share it with anyone you'd like to join your household &mdash; they'll need to create an account and enter the code.</dd>
+      <dd>Click the invite code in the top-right corner of the app to copy it. Share it with anyone you'd like to join your household.</dd>
     </dl>
   </div>
 </body>

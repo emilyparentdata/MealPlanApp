@@ -664,6 +664,12 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   align-items: center;
   gap: 0.3rem;
 }
+.day-status-select {
+  font-size: 0.8rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
 .planner-day-meal {
   display: flex;
   align-items: center;
@@ -699,6 +705,27 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 .planner-day-sides {
   margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.servings-select {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.3rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.meal-multiplier {
+  display: inline-block;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  margin-left: 0.4rem;
 }
 .sides-input {
   width: 100%;
@@ -765,6 +792,189 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   color: var(--text-light);
 }
 .plan-day-card.skip { opacity: 0.5; }
+.plan-day-card.leftovers { opacity: 0.7; }
+.plan-day-card.leftovers .meal-name { font-style: italic; }
+
+/* Feedback button on plan-view meal cards */
+.feedback-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-light);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.4rem;
+  transition: background 0.15s, color 0.15s;
+}
+.feedback-btn:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* Welcome card (new user onboarding) */
+.welcome-card {
+  background: var(--card);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.welcome-card h3 {
+  color: var(--primary-dark);
+  margin-bottom: 0.25rem;
+}
+.welcome-card > p {
+  color: var(--text-light);
+  margin-bottom: 1rem;
+}
+.welcome-steps {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.welcome-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+.welcome-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.welcome-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Empty state cards (actionable, replaces plain text) */
+.empty-state-card {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-light);
+}
+.empty-state-card p {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+/* Guide button and toolbar on This Week */
+.plan-view-toolbar {
+  margin-bottom: 1rem;
+}
+.guide-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  background: var(--card);
+  text-decoration: none;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius);
+  transition: background 0.15s, color 0.15s;
+}
+.guide-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Inline preference controls (used on manage cards + feedback modal) */
+.inline-pref-controls {
+  padding: 0.5rem 0 0.25rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.5rem;
+}
+.pref-row-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+.pref-label {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.pref-member-btns {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+.pref-member-btn {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pref-member-btn.active {
+  background: var(--love);
+  color: #fff;
+  border-color: var(--love);
+}
+.pref-flag-btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pref-flag-btn.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+.fav-flag-btn.active {
+  background: #fce4ec;
+  border-color: var(--love);
+  color: var(--love);
+}
+
+/* Top actions row (Favorite, Edit, Delete) on recipe cards */
+.pref-top-actions {
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+.pref-top-actions .btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+}
+
+/* Feedback modal body */
+#feedback-modal-body {
+  padding: 0.5rem 0;
+}
+#feedback-modal-body .inline-pref-controls {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
 
 /* === Grocery === */
 
@@ -859,6 +1069,55 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   text-decoration: line-through;
 }
 
+/* Item edit/delete actions */
+.grocery-checklist-items li {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.grocery-check {
+  flex: 1;
+  min-width: 0;
+}
+.grocery-item-actions {
+  display: flex;
+  gap: 0.1rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.grocery-checklist-items li:hover .grocery-item-actions {
+  opacity: 1;
+}
+.grocery-edit-btn,
+.grocery-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  line-height: 1;
+  border-radius: 4px;
+}
+.grocery-edit-btn:hover {
+  color: var(--primary);
+  background: var(--bg);
+}
+.grocery-delete-btn:hover {
+  color: var(--love);
+  background: var(--bg);
+}
+.grocery-edit-input {
+  flex: 1;
+  font-size: 0.95rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  outline: none;
+  margin: 0.1rem 0;
+}
+
 /* Extra items */
 .grocery-extras-section {
   background: var(--card);
@@ -885,9 +1144,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   color: var(--text-light);
   font-size: 0.85rem;
   font-style: italic;
-}
-.grocery-checklist-items li {
-  position: relative;
 }
 .extra-remove-btn {
   position: absolute;

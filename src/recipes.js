@@ -23,7 +23,7 @@ export function getRecipeByUid(uid) {
   return allRecipes.find(r => r.uid === uid);
 }
 
-export function renderRecipeList(container, recipes, onClick, preferences, { onToggleFavorite } = {}) {
+export function renderRecipeList(container, recipes, onClick, preferences, { onToggleFavorite, onRenderCard } = {}) {
   container.innerHTML = '';
   if (!recipes.length) {
     container.innerHTML = '<p style="color:var(--text-light);padding:2rem;">No recipes found.</p>';
@@ -73,12 +73,14 @@ export function renderRecipeList(container, recipes, onClick, preferences, { onT
       });
     }
 
+    if (onRenderCard) onRenderCard(card, r);
+
     card.addEventListener('click', () => onClick(r));
     container.appendChild(card);
   }
 }
 
-function buildStatusSummary(recipeUid, preferences) {
+export function buildStatusSummary(recipeUid, preferences) {
   if (!preferences) return '';
   const pref = preferences[recipeUid];
   if (!pref) return '';
