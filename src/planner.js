@@ -1,8 +1,8 @@
-import { getRecipes, getRecipeByUid } from './recipes.js';
+import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
 import { savePlan, loadPlan } from './firebase.js';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 let currentWeekStart = getMonday(new Date());
 
@@ -107,6 +107,7 @@ export async function renderPlanner(container, members) {
     const whoHome = dayData.whoHome || [...plannerMembers];
 
     const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
+    const selectedRecipe = dayData.recipeUid ? recipes.find(r => r.uid === dayData.recipeUid) : null;
 
     const dayEl = document.createElement('div');
     dayEl.className = 'planner-day';
@@ -129,15 +130,10 @@ export async function renderPlanner(container, members) {
         </select>
       </div>
       <div class="planner-day-meal">
-        <select class="meal-select">
-          <option value="">-- Select meal --</option>
-          ${recipes.map(r => {
-            const isSelected = dayData.recipeUid === r.uid;
-            const isUsedElsewhere = !isSelected && assignedThisWeek.has(r.uid);
-            const label = isUsedElsewhere ? `\u2713  ${r.name}` : r.name;
-            return `<option value="${escAttr(r.uid)}" ${isSelected ? 'selected' : ''}>${escHtml(label)}</option>`;
-          }).join('')}
-        </select>
+        <div class="meal-combo" data-recipe-uid="${escAttr(dayData.recipeUid || '')}">
+          <input type="text" class="meal-search" placeholder="Search recipes..." value="${escAttr(selectedRecipe ? selectedRecipe.name : '')}" autocomplete="off">
+          <div class="meal-dropdown hidden"></div>
+        </div>
         <button class="suggest-btn">Re-suggest</button>
         <button class="clear-btn">Clear</button>
       </div>
@@ -160,10 +156,12 @@ export async function renderPlanner(container, members) {
     };
 
     dayEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', saveDay));
-    dayEl.querySelector('.meal-select').addEventListener('change', saveDay);
     dayEl.querySelector('.day-status-select').addEventListener('change', saveDay);
     dayEl.querySelector('.sides-input').addEventListener('change', saveDay);
     dayEl.querySelector('.servings-select').addEventListener('change', saveDay);
+
+    // Searchable combo-box
+    setupMealCombo(dayEl, recipes, assignedThisWeek, saveDay);
 
     // Single-day re-suggest
     dayEl.querySelector('.suggest-btn').addEventListener('click', async () => {
@@ -172,7 +170,7 @@ export async function renderPlanner(container, members) {
       const assignedProteins = collectAssignedProteins(plan, dayName);
       const suggested = suggestMealForDay(dayEl, members, recentUids, assigned, assignedProteins);
       if (suggested) {
-        dayEl.querySelector('.meal-select').value = suggested.uid;
+        setComboValue(dayEl, suggested.uid, suggested.name);
         plan.days[dayName] = getDayDataFromEl(dayEl, members);
         plan.days[dayName].recipeUid = suggested.uid;
         plan.weekKey = weekKey;
@@ -183,7 +181,7 @@ export async function renderPlanner(container, members) {
     });
 
     dayEl.querySelector('.clear-btn').addEventListener('click', () => {
-      dayEl.querySelector('.meal-select').value = '';
+      setComboValue(dayEl, '', '');
       saveDay();
     });
 
@@ -192,20 +190,105 @@ export async function renderPlanner(container, members) {
 }
 
 function refreshDropdownMarkers(container, plan, recipes) {
-  const allAssigned = new Set();
-  for (const d of DAYS) {
-    if (plan.days[d]?.recipeUid) allAssigned.add(plan.days[d].recipeUid);
+  // No-op: combo-box handles display inline. Kept for API compat.
+}
+
+function setComboValue(dayEl, uid, name) {
+  const combo = dayEl.querySelector('.meal-combo');
+  const input = combo.querySelector('.meal-search');
+  combo.dataset.recipeUid = uid || '';
+  input.value = name || '';
+}
+
+function setupMealCombo(dayEl, recipes, assignedThisWeek, onSave) {
+  const combo = dayEl.querySelector('.meal-combo');
+  const input = combo.querySelector('.meal-search');
+  const dropdown = combo.querySelector('.meal-dropdown');
+
+  function renderOptions(query) {
+    const q = (query || '').toLowerCase().trim();
+    const currentUid = combo.dataset.recipeUid;
+    const filtered = q ? filterRecipes(q) : recipes;
+
+    dropdown.innerHTML = '';
+    if (!filtered.length) {
+      dropdown.innerHTML = '<div class="meal-dropdown-empty">No matches</div>';
+      dropdown.classList.remove('hidden');
+      return;
+    }
+    for (const r of filtered) {
+      const opt = document.createElement('div');
+      opt.className = 'meal-dropdown-item';
+      if (assignedThisWeek.has(r.uid) && r.uid !== currentUid) {
+        opt.classList.add('used-elsewhere');
+      }
+      opt.dataset.uid = r.uid;
+      opt.textContent = r.name;
+      opt.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // prevent blur
+        combo.dataset.recipeUid = r.uid;
+        input.value = r.name;
+        dropdown.classList.add('hidden');
+        onSave();
+      });
+      dropdown.appendChild(opt);
+    }
+    dropdown.classList.remove('hidden');
   }
 
-  container.querySelectorAll('.planner-day').forEach(dayEl => {
-    const select = dayEl.querySelector('.meal-select');
-    const currentVal = select.value;
-    for (const opt of select.options) {
-      if (!opt.value) continue; // skip placeholder
-      const r = recipes.find(rec => rec.uid === opt.value);
-      if (!r) continue;
-      const isUsedElsewhere = opt.value !== currentVal && allAssigned.has(opt.value);
-      opt.textContent = isUsedElsewhere ? `\u2713  ${r.name}` : r.name;
+  input.addEventListener('focus', () => {
+    input.select();
+    renderOptions(input.value);
+  });
+
+  input.addEventListener('input', () => {
+    // If user edits text, clear the selection until they pick again
+    combo.dataset.recipeUid = '';
+    renderOptions(input.value);
+  });
+
+  input.addEventListener('blur', () => {
+    // Delay to allow mousedown on dropdown item
+    setTimeout(() => {
+      dropdown.classList.add('hidden');
+      // If no valid selection, restore previous or clear
+      const uid = combo.dataset.recipeUid;
+      if (uid) {
+        const r = recipes.find(rec => rec.uid === uid);
+        if (r) input.value = r.name;
+      } else {
+        input.value = '';
+        onSave();
+      }
+    }, 150);
+  });
+
+  // Keyboard navigation
+  input.addEventListener('keydown', (e) => {
+    const items = dropdown.querySelectorAll('.meal-dropdown-item');
+    const active = dropdown.querySelector('.meal-dropdown-item.active');
+    let idx = Array.from(items).indexOf(active);
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (active) active.classList.remove('active');
+      idx = Math.min(idx + 1, items.length - 1);
+      items[idx]?.classList.add('active');
+      items[idx]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (active) active.classList.remove('active');
+      idx = Math.max(idx - 1, 0);
+      items[idx]?.classList.add('active');
+      items[idx]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (active) {
+        active.dispatchEvent(new MouseEvent('mousedown'));
+      }
+    } else if (e.key === 'Escape') {
+      dropdown.classList.add('hidden');
+      input.blur();
     }
   });
 }
@@ -219,7 +302,7 @@ function getDayDataFromEl(dayEl, members) {
     whoHome,
     makeAhead: dayEl.querySelector('.make-ahead')?.checked || false,
     skip: dayEl.querySelector('.day-status-select')?.value || false,
-    recipeUid: dayEl.querySelector('.meal-select')?.value || '',
+    recipeUid: dayEl.querySelector('.meal-combo')?.dataset.recipeUid || '',
     sides: dayEl.querySelector('.sides-input')?.value || '',
     servings: parseFloat(dayEl.querySelector('.servings-select')?.value) || 1,
   };
@@ -328,7 +411,7 @@ export async function suggestAllMeals(container, members) {
   for (let i = 0; i < dayEls.length; i++) {
     const dayEl = dayEls[i];
     const dayName = DAYS[i];
-    const currentMeal = dayEl.querySelector('.meal-select').value;
+    const currentMeal = dayEl.querySelector('.meal-combo')?.dataset.recipeUid;
     const isSkip = dayEl.querySelector('.day-status-select')?.value;
 
     if (!currentMeal && !isSkip) {

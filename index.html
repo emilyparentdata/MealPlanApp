@@ -293,7 +293,11 @@
     <div class="modal-content">
       <button class="modal-close">&times;</button>
       <div id="recipe-detail"></div>
-      <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-start;">
+        <div class="add-to-plan-wrap">
+          <button id="add-to-plan-btn" class="btn primary">Add to Plan</button>
+          <div id="add-to-plan-picker" class="day-picker hidden"></div>
+        </div>
         <button id="edit-from-detail-btn" class="btn">Edit Recipe</button>
         <button id="export-from-detail-btn" class="btn">Export Recipe</button>
       </div>

@@ -23,57 +23,103 @@ export function getRecipeByUid(uid) {
   return allRecipes.find(r => r.uid === uid);
 }
 
-export function renderRecipeList(container, recipes, onClick, preferences, { onToggleFavorite, onRenderCard } = {}) {
+export function renderRecipeList(container, recipes, onClick, preferences, callbacks = {}) {
   container.innerHTML = '';
   if (!recipes.length) {
     container.innerHTML = '<p style="color:var(--text-light);padding:2rem;">No recipes found.</p>';
     return;
   }
+  const { onEdit, onDelete, onToggleFavorite, onAddToPlan, onToggleDoesntEat, onToggleMakeAhead, members } = callbacks;
+
   for (const r of recipes) {
     const card = document.createElement('div');
     card.className = 'recipe-card';
     card.dataset.uid = r.uid;
 
-    const meta = [];
-    if (r.prep_time) meta.push(`Prep: ${r.prep_time}`);
-    if (r.cook_time) meta.push(`Cook: ${r.cook_time}`);
-    if (r.total_time) meta.push(`Total: ${r.total_time}`);
-    if (r.servings) meta.push(`Serves: ${r.servings}`);
+    const pref = preferences?.[r.uid] || {};
+    const isFav = pref.favorite;
+    const isMakeAhead = pref.makeAhead;
+    const doesntEat = pref.doesntEat || [];
 
-    const cats = (r.categories || [])
-      .map(c => `<span class="category-tag">${esc(c)}</span>`).join('');
+    // Action buttons row
+    const actions = [];
+    if (onEdit) actions.push(`<button class="card-action-btn edit-btn" title="Edit">Edit</button>`);
+    if (onDelete) actions.push(`<button class="card-action-btn delete-btn" title="Delete">Delete</button>`);
+    actions.push(`<button class="card-action-btn fav-action-btn${isFav ? ' active' : ''}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '\u2764 Favorite' : '\u2661 Favorite'}</button>`);
+    if (onAddToPlan) actions.push(`<button class="card-action-btn plan-btn" title="Add to Plan">Add to Plan</button>`);
 
-    // Build status summary from preferences
-    const statusHtml = buildStatusSummary(r.uid, preferences);
-
-    // Favorite button
-    const pref = preferences?.[r.uid];
-    const isFav = pref?.favorite;
-    const favHtml = `<button class="fav-btn ${isFav ? 'active' : ''}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '\u2764' : '\u2661'}</button>`;
+    // Family Preferences dropdown
+    const membersHtml = (members || []).map(m => {
+      const active = doesntEat.includes(m) ? ' active' : '';
+      return `<button class="pref-member-btn${active}" data-member="${esc(m)}">${esc(m)}</button>`;
+    }).join('');
 
     card.innerHTML = `
-      <div class="recipe-card-top">
-        <h3>${esc(r.name)}</h3>
-        ${favHtml}
-      </div>
-      <div class="recipe-meta">${meta.map(m => `<span>${esc(m)}</span>`).join('')}</div>
-      ${statusHtml}
-      ${cats ? `<div class="recipe-categories">${cats}</div>` : ''}
+      <h3 class="recipe-card-name">${esc(r.name)}</h3>
+      <div class="card-actions">${actions.join('')}</div>
+      <details class="card-detail family-prefs-detail">
+        <summary>Family Preferences</summary>
+        <div class="card-detail-body">
+          <span class="pref-label">Won't eat:</span>
+          <div class="pref-member-btns">${membersHtml || '<span class="pref-label">No members</span>'}</div>
+        </div>
+      </details>
+      <details class="card-detail tags-detail">
+        <summary>Tags</summary>
+        <div class="card-detail-body">
+          <button class="pref-flag-btn make-ahead-btn${isMakeAhead ? ' active' : ''}">Make Ahead</button>
+        </div>
+      </details>
     `;
 
-    // Favorite toggle
-    const favBtn = card.querySelector('.fav-btn');
+    // Wire actions — stop propagation so card click (view detail) doesn't fire
+    if (onEdit) {
+      card.querySelector('.edit-btn').addEventListener('click', (e) => { e.stopPropagation(); onEdit(r); });
+    }
+    if (onDelete) {
+      card.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); onDelete(r); });
+    }
+
+    // Favorite
+    const favBtn = card.querySelector('.fav-action-btn');
     if (favBtn && onToggleFavorite) {
       favBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const nowFav = await onToggleFavorite(r.uid);
-        favBtn.textContent = nowFav ? '\u2764' : '\u2661';
+        favBtn.textContent = nowFav ? '\u2764 Favorite' : '\u2661 Favorite';
         favBtn.classList.toggle('active', nowFav);
-        favBtn.title = nowFav ? 'Remove from favorites' : 'Add to favorites';
       });
     }
 
-    if (onRenderCard) onRenderCard(card, r);
+    // Add to Plan
+    if (onAddToPlan) {
+      card.querySelector('.plan-btn').addEventListener('click', (e) => { e.stopPropagation(); onAddToPlan(r); });
+    }
+
+    // Won't eat member buttons
+    card.querySelectorAll('.pref-member-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (onToggleDoesntEat) {
+          await onToggleDoesntEat(r.uid, btn.dataset.member);
+          btn.classList.toggle('active');
+        }
+      });
+    });
+
+    // Make Ahead
+    card.querySelector('.make-ahead-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (onToggleMakeAhead) {
+        await onToggleMakeAhead(r.uid);
+        e.target.classList.toggle('active');
+      }
+    });
+
+    // Prevent detail toggles from triggering card click
+    card.querySelectorAll('details, summary').forEach(el => {
+      el.addEventListener('click', (e) => e.stopPropagation());
+    });
 
     card.addEventListener('click', () => onClick(r));
     container.appendChild(card);

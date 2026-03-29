@@ -411,6 +411,76 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
+.recipe-card-name {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+/* Card action buttons row */
+.card-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.card-action-btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.card-action-btn:hover {
+  background: var(--primary-light);
+  color: white;
+  border-color: var(--primary-light);
+}
+.card-action-btn.delete-btn:hover {
+  background: #e53e3e;
+  border-color: #e53e3e;
+}
+.card-action-btn.fav-action-btn.active {
+  background: #fde8e8;
+  color: var(--love);
+  border-color: var(--love);
+}
+
+/* Collapsible detail sections inside cards */
+.card-detail {
+  margin-top: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+.card-detail summary {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 0.35rem 0;
+  user-select: none;
+  list-style: none;
+}
+.card-detail summary::before {
+  content: '\25b6';
+  display: inline-block;
+  margin-right: 0.35rem;
+  font-size: 0.6rem;
+  transition: transform 0.15s;
+}
+.card-detail[open] summary::before {
+  transform: rotate(90deg);
+}
+.card-detail summary::-webkit-details-marker { display: none; }
+.card-detail-body {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.25rem 0 0.5rem;
+}
+
+/* Legacy styles kept for other uses */
 .recipe-card-top {
   display: flex;
   align-items: flex-start;
@@ -493,6 +563,85 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   color: var(--text-light);
 }
 .modal-close:hover { color: var(--text); }
+
+/* Day picker (Add to Plan) */
+.add-to-plan-wrap {
+  position: relative;
+}
+.day-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  z-index: 210;
+  min-width: 260px;
+  padding: 0.25rem 0;
+}
+.day-picker.hidden { display: none; }
+.day-picker-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.day-picker-week-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.day-picker-prev,
+.day-picker-next {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem 0.5rem;
+  color: var(--primary);
+  border-radius: var(--radius);
+}
+.day-picker-prev:hover,
+.day-picker-next:hover {
+  background: var(--bg);
+}
+.recipe-card .day-picker {
+  bottom: auto;
+  top: calc(100% + 4px);
+}
+.day-picker-btn {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.day-picker-btn:hover {
+  background: var(--primary-light);
+  color: white;
+}
+.day-picker-btn:hover .day-picker-current { color: inherit; }
+.day-picker-day {
+  font-weight: 600;
+}
+.day-picker-day small {
+  font-weight: normal;
+  color: var(--text-light);
+}
+.day-picker-btn:hover .day-picker-day small { color: inherit; }
+.day-picker-current {
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+.day-picker-current.empty {
+  font-style: italic;
+}
 
 #recipe-detail h2 { margin-bottom: 1rem; }
 #recipe-detail .detail-section {
@@ -676,11 +825,55 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
-.planner-day-meal select {
+/* Searchable meal combo-box */
+.meal-combo {
   flex: 1;
+  position: relative;
+}
+.meal-combo .meal-search {
+  width: 100%;
   padding: 0.4rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  font-size: inherit;
+  box-sizing: border-box;
+}
+.meal-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.meal-dropdown.hidden { display: none; }
+.meal-dropdown-item {
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.meal-dropdown-item:hover,
+.meal-dropdown-item.active {
+  background: var(--primary-light);
+  color: white;
+}
+.meal-dropdown-item.used-elsewhere {
+  color: var(--text-light);
+}
+.meal-dropdown-item.used-elsewhere::before {
+  content: '\2713  ';
+}
+.meal-dropdown-empty {
+  padding: 0.6rem;
+  color: var(--text-light);
+  font-size: 0.85rem;
+  text-align: center;
 }
 .planner-day-meal .suggest-btn {
   background: var(--primary-light);
@@ -1951,7 +2144,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   .planner-day-meal {
     flex-wrap: wrap;
   }
-  .planner-day-meal select {
+  .meal-combo .meal-search {
     min-height: 40px;
     font-size: 0.9rem;
   }
@@ -1959,6 +2152,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   .planner-day-meal .clear-btn {
     min-height: 40px;
     padding: 0.5rem 0.85rem;
+  }
+  .day-picker {
+    min-width: 240px;
   }
 
   /* -- Plan view cards: stack vertically with spacing -- */
@@ -2088,6 +2284,16 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .card-action-btn {
+    min-height: 36px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  .card-detail summary {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
   }
 
   /* -- Toast: wider on mobile -- */

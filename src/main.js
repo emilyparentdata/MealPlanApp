@@ -1,7 +1,7 @@
 import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes } from './firebase.js';
-import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes, buildStatusSummary } from './recipes.js';
+import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, getRecipePrefs } from './preferences.js';
-import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey } from './planner.js';
+import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
 
@@ -1623,46 +1623,30 @@ function refreshManageRecipeList() {
     renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
     document.getElementById('recipe-modal').classList.remove('hidden');
   }, prefs, {
-    onToggleFavorite: async (recipeUid) => {
-      const nowFav = await toggleFavorite(recipeUid);
-      // Update status chips on the card
-      const card = container.querySelector(`[data-uid="${recipeUid}"]`);
-      if (card) {
-        const statusEl = card.querySelector('.recipe-status');
-        const newHtml = buildStatusSummary(recipeUid, getAllPreferences());
-        if (statusEl) statusEl.outerHTML = newHtml || '<div class="recipe-status"></div>';
-      }
-      return nowFav;
+    members,
+    onEdit: (recipe) => openEditModal(recipe),
+    onDelete: async (recipe) => {
+      if (!await confirmDelete(recipe.name)) return;
+      await archiveRecipe(recipe.uid);
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      refreshManageRecipeList();
+      showToast(`"${recipe.name}" deleted.`);
     },
-    onRenderCard: (card, recipe) => {
-      const refreshStatus = () => {
-        const statusEl = card.querySelector('.recipe-status');
-        const newHtml = buildStatusSummary(recipe.uid, getAllPreferences());
-        if (statusEl) statusEl.outerHTML = newHtml || '<div class="recipe-status"></div>';
-        else {
-          const cats = card.querySelector('.recipe-categories');
-          if (cats) cats.insertAdjacentHTML('beforebegin', newHtml);
-        }
-      };
-
-      const prefControls = buildInlinePreferenceControls(recipe.uid, {
-        onUpdate: refreshStatus,
-        onEdit: () => openEditModal(recipe),
-        onDelete: async () => {
-          if (!await confirmDelete(recipe.name)) return;
-          await archiveRecipe(recipe.uid);
-          await loadHouseholdRecipes();
-          await loadRecipes();
-          refreshManageRecipeList();
-          showToast(`"${recipe.name}" deleted.`);
-        }
-      });
-
-      // Insert before categories
-      const cats = card.querySelector('.recipe-categories');
-      if (cats) card.insertBefore(prefControls, cats);
-      else card.appendChild(prefControls);
-    }
+    onToggleFavorite: async (recipeUid) => {
+      return await toggleFavorite(recipeUid);
+    },
+    onAddToPlan: (recipe) => {
+      const card = container.querySelector(`[data-uid="${recipe.uid}"]`);
+      const btn = card?.querySelector('.plan-btn');
+      if (btn) showDayPicker(recipe, btn);
+    },
+    onToggleDoesntEat: async (recipeUid, member) => {
+      await toggleDoesntEat(recipeUid, member);
+    },
+    onToggleMakeAhead: async (recipeUid) => {
+      await toggleMakeAhead(recipeUid);
+    },
   });
 }
 
@@ -1745,6 +1729,105 @@ function setupEditModal() {
     const safeName = currentDetailRecipe.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     exportRecipesToFile([currentDetailRecipe], `${safeName}.json`);
     showToast(`"${currentDetailRecipe.name}" exported!`);
+  });
+
+  // Add to Plan from detail modal
+  setupAddToPlan();
+}
+
+async function showDayPicker(recipe, anchorEl, onDone) {
+  // Reuse or create a picker element anchored to the button
+  let picker = anchorEl.parentElement.querySelector('.day-picker');
+  if (!picker) {
+    picker = document.createElement('div');
+    picker.className = 'day-picker hidden';
+    anchorEl.parentElement.style.position = 'relative';
+    anchorEl.parentElement.appendChild(picker);
+  }
+
+  // Track which week is shown; start from the planner's current week
+  let pickerWeekStart = new Date(getCurrentWeekStart());
+
+  async function renderPickerWeek() {
+    const weekKey = getWeekKey(pickerWeekStart);
+    const plan = await loadPlan(weekKey) || { days: {} };
+
+    picker.innerHTML = '';
+
+    // Week navigation header
+    const nav = document.createElement('div');
+    nav.className = 'day-picker-nav';
+    nav.innerHTML = `<button class="day-picker-prev">&laquo;</button><span class="day-picker-week-label">${getWeekLabel(pickerWeekStart)}</span><button class="day-picker-next">&raquo;</button>`;
+    nav.querySelector('.day-picker-prev').addEventListener('click', (e) => {
+      e.stopPropagation();
+      pickerWeekStart.setDate(pickerWeekStart.getDate() - 7);
+      renderPickerWeek();
+    });
+    nav.querySelector('.day-picker-next').addEventListener('click', (e) => {
+      e.stopPropagation();
+      pickerWeekStart.setDate(pickerWeekStart.getDate() + 7);
+      renderPickerWeek();
+    });
+    picker.appendChild(nav);
+
+    // Day buttons
+    for (let i = 0; i < 7; i++) {
+      const dayName = DAYS[i];
+      const dayDate = new Date(pickerWeekStart);
+      dayDate.setDate(dayDate.getDate() + i);
+      const shortDate = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const existingUid = plan.days[dayName]?.recipeUid;
+      const existingRecipe = existingUid ? getRecipes().find(r => r.uid === existingUid) : null;
+
+      const dayBtn = document.createElement('button');
+      dayBtn.className = 'day-picker-btn';
+      if (existingRecipe) {
+        dayBtn.innerHTML = `<span class="day-picker-day">${dayName} <small>${shortDate}</small></span><span class="day-picker-current">${escManage(existingRecipe.name)}</span>`;
+      } else {
+        dayBtn.innerHTML = `<span class="day-picker-day">${dayName} <small>${shortDate}</small></span><span class="day-picker-current empty">No meal planned</span>`;
+      }
+
+      dayBtn.addEventListener('click', async () => {
+        if (!plan.days[dayName]) plan.days[dayName] = {};
+        plan.days[dayName].recipeUid = recipe.uid;
+        plan.weekKey = weekKey;
+        plan.updated = Date.now();
+        await savePlan(weekKey, plan);
+        picker.classList.add('hidden');
+        showToast(`"${recipe.name}" added to ${dayName}!`);
+        if (onDone) onDone();
+      });
+
+      picker.appendChild(dayBtn);
+    }
+  }
+
+  // If already visible, toggle off
+  if (!picker.classList.contains('hidden')) {
+    picker.classList.add('hidden');
+    return;
+  }
+
+  await renderPickerWeek();
+  picker.classList.remove('hidden');
+}
+
+function setupAddToPlan() {
+  const btn = document.getElementById('add-to-plan-btn');
+
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!currentDetailRecipe) return;
+    await showDayPicker(currentDetailRecipe, btn, () => {
+      document.getElementById('recipe-modal').classList.add('hidden');
+    });
+  });
+
+  // Close any open day-pickers when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.add-to-plan-wrap') && !e.target.closest('.day-picker') && !e.target.closest('.plan-btn')) {
+      document.querySelectorAll('.day-picker').forEach(p => p.classList.add('hidden'));
+    }
   });
 }
 
