@@ -219,7 +219,7 @@ const UNITS = ['cups?', 'tbsp', 'tsp', 'tablespoons?', 'teaspoons?', 'oz', 'ounc
   'pinch(?:es)?', 'bunch(?:es)?', 'handfuls?', 'sticks?', 'bags?', 'bottles?', 'jars?', 'pieces?'];
 const UNIT_RE = new RegExp(`^(${UNITS.join('|')})\\b\\.?\\s*(?:of\\s+)?`, 'i');
 
-const PREP_WORDS = /\b(finely|roughly|thinly|freshly|lightly|well)?\s*-?\s*(diced|chopped|minced|sliced|grated|shredded|crushed|julienned|cubed|halved|quartered|trimmed|peeled|seeded|deveined|deboned|thawed|frozen|fresh|dried|ground|cooked|uncooked|warm|warmed|cold|softened|melted|room temperature|to taste|optional|divided|packed|sifted|beaten|whisked|juiced|zested|squeezed|rinsed|drained|pitted|cored|stemmed|cleaned|washed|torn|cut into.*|about|toasted|roasted|unsalted|low-sodium|low sodium|reduced-sodium|boneless|skinless|skin-on|bone-in|thin-cut|thick-cut|store-bought|good-quality|pickled|smoked)\b/gi;
+const PREP_WORDS = /\b(finely|roughly|thinly|freshly|lightly|well|coarsely)?\s*-?\s*(diced|chopped|minced|sliced|grated|shredded|crushed|julienned|cubed|halved|quartered|trimmed|peeled|seeded|deveined|deboned|thawed|frozen|fresh|dried|ground|cooked|uncooked|warm|warmed|cold|softened|melted|room temperature|to taste|optional|divided|packed|sifted|beaten|whisked|juiced|zested|squeezed|rinsed|drained|pitted|cored|stemmed|cleaned|washed|torn|cut into.*|about|toasted|roasted|unsalted|low-sodium|low sodium|reduced-sodium|boneless|skinless|skin-on|bone-in|thin-cut|thick-cut|store-bought|good-quality|pickled|smoked|jarred|opened|oil-packed|oil packed|sun-dried|sundried|fine|finely|roughly|thinly|freshly|lightly|coarsely)\b/gi;
 
 function parseFraction(s) {
   s = s.trim();
@@ -291,16 +291,15 @@ function parseIngredient(line) {
   let name = s
     .replace(/\(.*?\)/g, '')       // remove parenthetical notes
     .replace(PREP_WORDS, '')       // remove prep descriptors
-    .replace(/,?\s*for\s+(serving|garnish|topping|dipping|drizzling)s?$/i, '')  // "for serving" etc.
+    .replace(/,?\s*for\s+(serving|garnish|topping|dipping|drizzling)s?/i, '')  // "for serving" etc. (anywhere, not just end)
     .replace(/,?\s*and\s+more\s+for\s+.*$/i, '')  // "and more for serving"
-    .replace(/,?\s*plus\s+more\s+.*$/i, '')        // "plus more for drizzling"
+    .replace(/,?\s*plus\s+(more|extra)\b.*$/i, '')  // "plus more for drizzling", "plus extra"
     .replace(/,?\s*or\s+to\s+taste$/i, '')         // "or to taste"
     .replace(/,?\s*as\s+needed$/i, '')             // "as needed"
     .replace(/\s+or\s+other\s+[\w\s]+$/i, '')      // "or other sweetener"
     .replace(/\s+or\s+[\w\s]{2,}$/i, '')           // "or tamari", "or fish sauce" — strip alternatives (2+ chars to avoid stripping single words that are the ingredient)
     .replace(/,?\s*and\s*$/i, '')                  // trailing ", and" or "and"
     .replace(/,?\s*plus\s+\d.*$/i, '')             // "plus 2 tablespoons adobo sauce"
-    .replace(/,?\s*plus\s+additional.*$/i, '')     // "plus additional"
     .replace(/,\s*,/g, ',')       // collapse double commas
     .replace(/^[,\s]+/, '')        // leading commas/spaces
     .replace(/[,\s]+$/, '')        // trailing commas/spaces
@@ -308,9 +307,48 @@ function parseIngredient(line) {
     .trim();
 
   // Build a normalized key (lowercase, no punctuation)
-  const key = name.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  let key = name.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+
+  // Normalize synonyms so variants merge
+  key = normalizeKey(key);
 
   return { qty, unit, name, key };
+}
+
+// Normalize ingredient keys so that common variants merge into one entry.
+// Order matters: more specific patterns first.
+function normalizeKey(key) {
+  // Strip size/color adjectives that don't change what you buy
+  key = key.replace(/\b(large|medium|small|extra-large|extra large|big)\b/g, '').trim();
+
+  // "garlic cloves" / "clove garlic" / "cloves garlic" → "garlic"
+  key = key.replace(/\bgarlic\s+cloves?\b/, 'garlic').replace(/\bcloves?\s+(?:of\s+)?garlic\b/, 'garlic');
+
+  // "basil leaves" → "basil"
+  key = key.replace(/\bbasil\s+leaves?\b/, 'basil');
+
+  // "parmesan cheese" / "parmigiano reggiano" → "parmesan"
+  key = key.replace(/\bparmesan\s+cheese\b/, 'parmesan').replace(/\bparmigiano[\s-]+reggiano\b/, 'parmesan');
+
+  // "all-purpose flour" / "allpurpose flour" / "ap flour" → "flour"
+  key = key.replace(/\b(all[\s-]?purpose|ap)\s+flour\b/, 'flour');
+
+  // "yellow onions" / "white onions" / "sweet onions" → "onions" (but not "green onion")
+  key = key.replace(/\b(yellow|white|sweet|red|vidalia|spanish)\s+onions?\b/, 'onion');
+
+  // Collapse trailing "s" plurals for common produce
+  key = key.replace(/\bonions\b/, 'onion').replace(/\bpotatoes\b/, 'potato').replace(/\btomatoes\b/, 'tomato');
+
+  // "flat leaf parsley" / "flat-leaf parsley" / "italian parsley" → "parsley"
+  key = key.replace(/\b(flat[\s-]?leaf|italian|curly)\s+parsley\b/, 'parsley');
+
+  // "hungarian sweet paprika" / "hungarian hot paprika" are distinct, but bare "hungarian paprika" → "hungarian sweet paprika"
+  // (sweet is the default)
+  if (key === 'hungarian paprika') key = 'hungarian sweet paprika';
+
+  // Final cleanup
+  key = key.replace(/\s+/g, ' ').trim();
+  return key;
 }
 
 function isNotIngredient(line) {
@@ -362,7 +400,7 @@ function aggregateIngredients(meals) {
         if (isNotIngredient(line)) continue;
         const parsed = parseIngredient(line);
         if (!parsed.key) continue;
-        if (isSaltOrPepper(parsed.key)) continue;
+        if (isAlwaysOnHand(parsed.key)) continue;
         addToMap(ingredientMap, parsed.key, parsed.name, parsed.qty, parsed.unit, m.recipe.name, m.servings || 1);
       }
     }
@@ -370,11 +408,10 @@ function aggregateIngredients(meals) {
     // Process sides (e.g. "rice, salad, bread")
     if (m.sides) {
       const sideItems = m.sides.split(',').map(s => s.trim()).filter(Boolean);
-      const mealLabel = `${m.recipe.name} (${m.day})`;
       for (const side of sideItems) {
         const key = side.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
         if (!key) continue;
-        addToMap(ingredientMap, key, side, null, '', mealLabel);
+        addToMap(ingredientMap, key, side, null, '', m.recipe.name);
       }
     }
   }
@@ -388,7 +425,9 @@ function aggregateIngredients(meals) {
   const other = [];
 
   for (const [, entry] of ingredientMap) {
-    const section = categorizeIngredient(entry.name);
+    // If the unit is "can" or "jar", it's a pantry item regardless of ingredient name
+    const hasShelfUnit = entry.quantities.some(q => /^(can|jar|bottle|bag|package|packet|box)$/.test(q.unit));
+    const section = hasShelfUnit ? 'pantry' : categorizeIngredient(entry.name);
     const suppressQty = section === 'pantry' || section === 'spices' || isStapleDairy(entry.name);
     const display = buildDisplayText(entry, suppressQty);
     const item = { display, meals: entry.meals, key: entry.key, name: entry.name };
@@ -461,13 +500,16 @@ function pluralizeUnit(unit) {
   return unit + 's';
 }
 
-// Salt and pepper are always in the house — never add to grocery list
-function isSaltOrPepper(key) {
-  // Any form of just salt or pepper
+// Items always on hand — never add to grocery list
+function isAlwaysOnHand(key) {
+  // Salt in any form
   if (/^(kosher |sea |flaky |table |fine |coarse |seasoning )?salt\b/.test(key)) return true;
+  // Pepper in any form
   if (/^(black |white |cracked |ground |freshly ground )?pepper$/.test(key)) return true;
-  // Combined "salt and pepper" in any form
+  // Combined "salt and pepper"
   if (/salt\s+and\s+(black\s+)?pepper/.test(key)) return true;
+  // Water
+  if (/^(warm |cold |hot |ice |boiling |room temperature )?water$/.test(key)) return true;
   return false;
 }
 
@@ -482,16 +524,21 @@ function categorizeIngredient(ing) {
     ['coconut milk', 'pantry'], ['coconut oil', 'pantry'], ['coconut cream', 'pantry'],
     ['lemon juice', 'pantry'], ['lime juice', 'pantry'],
     ['cream of mushroom', 'pantry'], ['cream of chicken', 'pantry'],
+    ['chicken stock', 'pantry'], ['chicken broth', 'pantry'], ['beef stock', 'pantry'], ['beef broth', 'pantry'],
+    ['vegetable stock', 'pantry'], ['vegetable broth', 'pantry'],
     ['peanut butter', 'pantry'], ['almond butter', 'pantry'],
     ['soy sauce', 'pantry'], ['fish sauce', 'pantry'], ['hot sauce', 'pantry'], ['chili-garlic sauce', 'pantry'], ['chili garlic sauce', 'pantry'],
     ['hamburger bun', 'pantry'], ['hot dog bun', 'pantry'],
-    ['red pepper flake', 'spices'],
+    ['red pepper flake', 'spices'], ['red-pepper flake', 'spices'],
     ['provolone', 'dairy'], ['pecorino', 'dairy'], ['romano', 'dairy'],
     ['sesame seed', 'pantry'], ['sesame seeds', 'pantry'], ['peanut', 'pantry'], ['peanuts', 'pantry'],
+    ['walnut', 'pantry'], ['walnuts', 'pantry'], ['almond', 'pantry'], ['almonds', 'pantry'], ['pecan', 'pantry'], ['pecans', 'pantry'], ['cashew', 'pantry'], ['pine nut', 'pantry'],
     ['mixed greens', 'produce'], ['greens', 'produce'],
     ['sriracha', 'pantry'], ['molasses', 'pantry'], ['maple syrup', 'pantry'],
     ['chipotle', 'pantry'], ['adobo', 'pantry'],
     ['cornstarch', 'pantry'],
+    ['lard', 'pantry'], ['shortening', 'pantry'],
+    ['white wine', 'pantry'], ['red wine', 'pantry'], ['cooking wine', 'pantry'], ['wine', 'pantry'],
   ];
   for (const [phrase, cat] of overrides) {
     if (lower.includes(phrase)) return cat;
@@ -499,7 +546,7 @@ function categorizeIngredient(ing) {
 
   const meatWords = ['chicken', 'beef', 'pork', 'sausage', 'salmon', 'fish', 'bacon', 'turkey', 'shrimp', 'cod', 'tilapia', 'hot dog', 'meatball', 'ground beef', 'stew meat', 'pepperoni', 'ham', 'steak', 'tofu', 'tempeh', 'seitan', 'lamb', 'veal', 'brisket', 'ribs', 'flank', 'sirloin', 'tenderloin', 'mahi', 'halibut', 'tuna', 'crab', 'lobster', 'scallop', 'clam', 'mussel', 'anchov', 'prosciutto', 'chorizo', 'bratwurst', 'kielbasa'];
   const dairyWords = ['cheese', 'milk', 'butter', 'cream', 'egg', 'eggs', 'yogurt', 'sour cream', 'mozzarella', 'parmesan', 'cheddar', 'gruyere', 'ricotta', 'fontina', 'provolone', 'pecorino', 'romano'];
-  const produceWords = ['lettuce', 'tomato', 'onion', 'garlic', 'pepper', 'broccoli', 'broccolini', 'carrot', 'celery', 'spinach', 'basil', 'cilantro', 'parsley', 'lime', 'lemon', 'avocado', 'potato', 'mushroom', 'corn', 'peas', 'snap pea', 'green onion', 'ginger', 'romaine', 'cherry tomato', 'bell pepper', 'jalape', 'zucchini', 'cucumber', 'cabbage', 'kale', 'arugula', 'scallion', 'shallot', 'sweet potato', 'asparagus', 'coleslaw'];
+  const produceWords = ['lettuce', 'tomato', 'onion', 'garlic', 'pepper', 'broccoli', 'broccolini', 'carrot', 'celery', 'spinach', 'basil', 'cilantro', 'parsley', 'lime', 'lemon', 'avocado', 'potato', 'mushroom', 'corn', 'peas', 'snap pea', 'green onion', 'ginger', 'romaine', 'cherry tomato', 'bell pepper', 'jalape', 'zucchini', 'cucumber', 'cabbage', 'kale', 'arugula', 'scallion', 'shallot', 'sweet potato', 'asparagus', 'coleslaw', 'chive', 'cauliflower', 'fennel', 'radish', 'turnip', 'beet', 'bok choy', 'watercress', 'endive', 'leek'];
   const spiceWords = ['cumin', 'paprika', 'thyme', 'oregano', 'cinnamon', 'seasoning', 'spice', 'taco seasoning', 'chili powder', 'italian seasoning', 'garam masala', 'turmeric', 'cayenne', 'bay leaves', 'nutmeg', 'coriander', 'cardamom', 'cloves', 'allspice', 'curry powder', 'red pepper flake', 'smoked paprika', 'dried basil', 'dried parsley', 'rosemary', 'dill'];
   const pantryWords = ['flour', 'sugar', 'oil', 'vinegar', 'sauce', 'broth', 'stock', 'soy sauce', 'honey', 'mustard', 'ketchup', 'mayo', 'mayonnaise', 'pasta', 'rice', 'noodle', 'bread', 'tortilla', 'can ', 'canned', 'beans', 'panko', 'breadcrumb', 'cornstarch', 'baking', 'worcestershire', 'ranch', 'enchilada sauce', 'pizza sauce', 'marinara', 'pesto', 'bbq', 'naan', 'flatbread', 'crescent roll', 'pie crust', 'pizza dough', 'cornmeal', 'molasses', 'maple syrup', 'sriracha', 'bun', 'taco shell'];
 

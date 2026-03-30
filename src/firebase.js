@@ -392,3 +392,21 @@ export async function saveGroceryExtras(items) {
   await col('settings').doc('groceryExtras').set({ items });
 }
 
+// === Use-Up Items (ingredients to prioritize in meal planning) ===
+
+export async function loadUseUpItems(weekKey) {
+  if (!firebaseEnabled || !householdId) {
+    return JSON.parse(localStorage.getItem(`useup_${weekKey}`) || '[]');
+  }
+  const doc = await col('useUpItems').doc(weekKey).get();
+  return doc.exists ? (doc.data().items || []) : [];
+}
+
+export async function saveUseUpItems(weekKey, items) {
+  if (!firebaseEnabled || !householdId) {
+    localStorage.setItem(`useup_${weekKey}`, JSON.stringify(items));
+    return;
+  }
+  await col('useUpItems').doc(weekKey).set({ items, updated: Date.now() });
+}
+

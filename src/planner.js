@@ -1,6 +1,6 @@
 import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
-import { savePlan, loadPlan } from './firebase.js';
+import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems } from './firebase.js';
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -92,10 +92,55 @@ export async function renderPlanner(container, members) {
   const weekKey = getWeekKey();
   const plan = await loadPlan(weekKey) || { days: {} };
   const recipes = getRecipes();
+  const useUpItems = await loadUseUpItems(weekKey);
 
   const plannerMembers = members;
 
   container.innerHTML = '';
+
+  // Use-up items panel
+  const useUpEl = document.createElement('div');
+  useUpEl.className = 'use-up-panel';
+  useUpEl.innerHTML = `
+    <div class="use-up-header">
+      <strong>Use up this week</strong>
+      <span class="use-up-hint">Ingredients you already have — meals using these get priority</span>
+    </div>
+    <div class="use-up-tags">${useUpItems.map(item => `<span class="use-up-tag">${escHtml(item)}<button class="use-up-remove" data-item="${escAttr(item)}">&times;</button></span>`).join('')}</div>
+    <div class="use-up-add">
+      <input type="text" class="use-up-input" placeholder="e.g. ricotta, leftover chicken...">
+      <button class="btn use-up-add-btn">Add</button>
+    </div>
+  `;
+  container.appendChild(useUpEl);
+
+  // Use-up event handlers
+  const addUseUpItem = async () => {
+    const input = useUpEl.querySelector('.use-up-input');
+    const val = input.value.trim();
+    if (!val) return;
+    // Support comma-separated entries
+    const newItems = val.split(',').map(s => s.trim()).filter(Boolean);
+    const current = await loadUseUpItems(weekKey);
+    const merged = [...current, ...newItems.filter(n => !current.some(c => c.toLowerCase() === n.toLowerCase()))];
+    await saveUseUpItems(weekKey, merged);
+    input.value = '';
+    renderPlanner(container, members);
+  };
+
+  useUpEl.querySelector('.use-up-add-btn').addEventListener('click', addUseUpItem);
+  useUpEl.querySelector('.use-up-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addUseUpItem(); }
+  });
+
+  useUpEl.querySelectorAll('.use-up-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const item = btn.dataset.item;
+      const current = await loadUseUpItems(weekKey);
+      await saveUseUpItems(weekKey, current.filter(i => i !== item));
+      renderPlanner(container, members);
+    });
+  });
 
   // Step 1: Constraint cards for each day
   for (let i = 0; i < 7; i++) {
@@ -168,7 +213,7 @@ export async function renderPlanner(container, members) {
       const recentUids = await getRecentRecipeUids();
       const assigned = collectAssignedThisWeek(plan, dayName);
       const assignedProteins = collectAssignedProteins(plan, dayName);
-      const suggested = suggestMealForDay(dayEl, members, recentUids, assigned, assignedProteins);
+      const suggested = suggestMealForDay(dayEl, members, recentUids, assigned, assignedProteins, useUpItems);
       if (suggested) {
         setComboValue(dayEl, suggested.uid, suggested.name);
         plan.days[dayName] = getDayDataFromEl(dayEl, members);
@@ -342,7 +387,7 @@ function collectAssignedProteins(plan, excludeDay) {
 
 // === Core suggestion logic for one day ===
 
-function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins) {
+function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems = []) {
   const dayData = getDayDataFromEl(dayEl, members);
   if (dayData.skip === true || dayData.skip === 'skip' || dayData.skip === 'leftovers') return null;
 
@@ -369,6 +414,16 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
 
     // Boost favorited recipes
     if (recipePref.favorite) score += 3;
+
+    // Boost recipes that use ingredients the user wants to use up
+    if (useUpItems.length > 0) {
+      const recipeText = `${recipe.name} ${recipe.ingredients || ''}`.toLowerCase();
+      for (const item of useUpItems) {
+        if (recipeText.includes(item.toLowerCase())) {
+          score += 5;
+        }
+      }
+    }
 
     // Protein variety bonus/penalty
     const recipeProteins = detectProtein(recipe);
@@ -404,6 +459,7 @@ export async function suggestAllMeals(container, members) {
   const weekKey = getWeekKey();
   const plan = await loadPlan(weekKey) || { days: {} };
   const recentUids = await getRecentRecipeUids();
+  const useUpItems = await loadUseUpItems(weekKey);
 
   const dayEls = container.querySelectorAll('.planner-day');
 
@@ -417,7 +473,7 @@ export async function suggestAllMeals(container, members) {
     if (!currentMeal && !isSkip) {
       const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
       const assignedProteins = collectAssignedProteins(plan, dayName);
-      const suggested = suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins);
+      const suggested = suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems);
       if (suggested) {
         plan.days[dayName] = getDayDataFromEl(dayEl, members);
         plan.days[dayName].recipeUid = suggested.uid;

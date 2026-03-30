@@ -2,28 +2,47 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #f5f3f0;
-  --card: #ffffff;
-  --primary: #2d6a4f;
-  --primary-light: #52b788;
-  --primary-dark: #1b4332;
-  --accent: #e76f51;
-  --text: #2b2d42;
-  --text-light: #6c757d;
-  --border: #dee2e6;
+  /* ParentData palette */
+  --bg: #FEFCEE;
+  --card: #FFFFFF;
+  --primary: #2B5B3F;
+  --primary-light: #D6EAE0;
+  --primary-dark: #282828;
+  --accent: #FDEDA9;
+  --text: #282828;
+  --text-light: #555050;
+  --text-faint: #888480;
+  --border: #E5DCB5;
+  --bg-yellow-mid: #FEF7D8;
+  --green-mid: #9ECAB4;
+
+  /* App-specific (ratings) */
   --love: #e63946;
   --like: #457b9d;
   --acceptable: #a8dadc;
   --unacceptable: #ccc;
-  --radius: 8px;
-  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+
+  /* Typography */
+  --font-serif: 'Lora', Georgia, serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-nav: 'Outfit', system-ui, sans-serif;
+
+  /* Geometry */
+  --radius: 10px;
+  --r-card: 24px;
+  --r-btn: 4px;
+  --r-pill: 50px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text);
+  font-size: 15px;
+  line-height: 1.65;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* === Login Screen === */
@@ -38,16 +57,19 @@ body {
 
 .login-card {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
+  border: 0.8px solid var(--border);
   padding: 2.5rem 2rem;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow);
   max-width: 400px;
   width: 100%;
   text-align: center;
 }
 .login-card h1 {
-  color: var(--primary-dark);
+  font-family: var(--font-serif);
+  color: var(--text);
   font-size: 1.8rem;
+  font-weight: 400;
   margin-bottom: 0.5rem;
 }
 .login-card .brand-byline {
@@ -76,8 +98,8 @@ body {
   font-size: 0.95rem;
 }
 .google-btn {
-  background: white;
-  border: 2px solid var(--border);
+  background: var(--card);
+  border: 0.8px solid var(--primary-dark);
   font-weight: 600;
   color: var(--text);
 }
@@ -144,9 +166,11 @@ body {
 #household-setup.hidden { display: none; }
 #household-setup .login-card { text-align: left; max-width: 450px; }
 #household-setup h3 {
+  font-family: var(--font-serif);
   font-size: 1rem;
+  font-weight: 500;
   margin-bottom: 0.75rem;
-  color: var(--primary-dark);
+  color: var(--text);
 }
 #household-setup input[type="text"] {
   width: 100%;
@@ -212,7 +236,9 @@ header {
 }
 
 header h1 {
+  font-family: var(--font-serif);
   font-size: 1.4rem;
+  font-weight: 400;
   white-space: nowrap;
 }
 
@@ -235,15 +261,17 @@ header .brand-byline a {
   background: transparent;
   color: rgba(255,255,255,0.7);
   border: none;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius);
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--r-pill);
   cursor: pointer;
+  font-family: var(--font-nav);
   font-size: 0.85rem;
-  transition: all 0.2s;
+  font-weight: 500;
+  transition: all 0.15s;
 }
 .nav-btn:hover { color: white; background: rgba(255,255,255,0.1); }
 .nav-btn.primary-nav { color: white; font-weight: 600; }
-.nav-btn.active { color: white; background: var(--primary); }
+.nav-btn.active { color: var(--text); background: var(--bg-yellow-mid); }
 .nav-sep {
   width: 1px;
   height: 1.2rem;
@@ -291,20 +319,23 @@ main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
-.page-header h2 { font-size: 1.5rem; }
+.page-header h2 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 400; }
 
 /* === Search === */
 input[type="text"], input[type="email"], input[type="password"], textarea, select {
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
+  border: 0.8px solid var(--border);
   border-radius: var(--radius);
+  background: var(--bg);
   font-size: 0.9rem;
   font-family: inherit;
+  color: var(--text);
+  transition: border-color 0.15s;
 }
 input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(45,106,79,0.1);
+  border-color: var(--text);
+  box-shadow: none;
 }
 
 #recipe-search, #pref-search {
@@ -330,18 +361,19 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .home-section-label {
   max-width: 800px;
   margin: 0 auto 1rem;
-  font-size: 0.85rem;
+  font-size: 10px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-light);
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
 }
 .home-card {
   background: var(--card);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-card);
   padding: 1.5rem 1.25rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.15s;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -350,18 +382,17 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   font-family: inherit;
 }
 .home-card:hover {
-  border-color: var(--primary);
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  border-color: #C8BF9A;
 }
 .home-card-icon {
   font-size: 2.2rem;
   line-height: 1;
 }
 .home-card-title {
+  font-family: var(--font-serif);
   font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--primary-dark);
+  font-weight: 500;
+  color: var(--text);
 }
 .home-card-desc {
   font-size: 0.8rem;
@@ -400,16 +431,15 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 .recipe-card {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1rem;
-  box-shadow: var(--shadow);
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  border: 0.8px solid var(--border);
   border-left: 4px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
 .recipe-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-color: #C8BF9A;
 }
 .recipe-card-name {
   font-size: 1rem;
@@ -427,16 +457,16 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .card-action-btn {
   font-size: 0.75rem;
   padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg);
+  border-radius: var(--r-btn);
+  border: 0.8px solid var(--border);
+  background: var(--card);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 .card-action-btn:hover {
-  background: var(--primary-light);
-  color: white;
-  border-color: var(--primary-light);
+  background: var(--bg-yellow-mid);
+  color: var(--text);
+  border-color: #C8BF9A;
 }
 .card-action-btn.delete-btn:hover {
   background: #e53e3e;
@@ -534,7 +564,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(40,40,40,0.38);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -543,8 +573,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 }
 .modal.hidden { display: none; }
 .modal-content {
-  background: white;
-  border-radius: var(--radius);
+  background: var(--card);
+  border-radius: var(--r-card);
+  border: 0.8px solid var(--border);
   padding: 2rem;
   max-width: 700px;
   width: 100%;
@@ -572,10 +603,10 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   position: absolute;
   bottom: calc(100% + 4px);
   left: 0;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  background: var(--card);
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
   z-index: 210;
   min-width: 260px;
   padding: 0.25rem 0;
@@ -623,8 +654,8 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   font-size: 0.9rem;
 }
 .day-picker-btn:hover {
-  background: var(--primary-light);
-  color: white;
+  background: var(--bg-yellow-mid);
+  color: var(--text);
 }
 .day-picker-btn:hover .day-picker-current { color: inherit; }
 .day-picker-day {
@@ -648,11 +679,12 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   margin-bottom: 1.25rem;
 }
 #recipe-detail .detail-section h4 {
-  color: var(--primary);
+  color: var(--text-faint);
   margin-bottom: 0.5rem;
-  font-size: 0.85rem;
+  font-size: 10px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.12em;
 }
 #recipe-detail .detail-section pre {
   white-space: pre-wrap;
@@ -670,9 +702,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 .pref-row {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 0.75rem 1rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
 }
 .pref-row .recipe-name {
   font-weight: 500;
@@ -703,14 +735,14 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 .flag-btn {
   padding: 0.3rem 0.6rem;
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-btn);
   background: white;
   cursor: pointer;
   font-size: 0.75rem;
   transition: all 0.15s;
 }
-.flag-btn:hover { border-color: var(--accent); }
+.flag-btn:hover { border-color: var(--text); }
 .flag-btn.active {
   background: var(--accent);
   color: white;
@@ -770,14 +802,15 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   gap: 0.75rem;
 }
 .week-selector button {
-  background: var(--primary);
+  background: var(--primary-dark);
   color: white;
-  border: none;
+  border: 0.8px solid var(--primary-dark);
   padding: 0.4rem 0.75rem;
-  border-radius: var(--radius);
+  border-radius: var(--r-btn);
   cursor: pointer;
+  transition: opacity 0.15s;
 }
-.week-selector button:hover { background: var(--primary-dark); }
+.week-selector button:hover { opacity: 0.82; }
 #week-label, #view-week-label, #grocery-week-label {
   font-weight: 600;
   min-width: 200px;
@@ -792,9 +825,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 .planner-day {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
 }
 .planner-day-header {
   display: flex;
@@ -804,7 +837,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   flex-wrap: wrap;
 }
 .planner-day-header h3 {
+  font-family: var(--font-serif);
   font-size: 1rem;
+  font-weight: 500;
   min-width: 100px;
 }
 .planner-day-header label {
@@ -843,14 +878,14 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   top: 100%;
   left: 0;
   right: 0;
-  background: white;
-  border: 1px solid var(--border);
+  background: var(--card);
+  border: 0.8px solid var(--border);
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
   max-height: 220px;
   overflow-y: auto;
   z-index: 100;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 .meal-dropdown.hidden { display: none; }
 .meal-dropdown-item {
@@ -860,8 +895,8 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 }
 .meal-dropdown-item:hover,
 .meal-dropdown-item.active {
-  background: var(--primary-light);
-  color: white;
+  background: var(--bg-yellow-mid);
+  color: var(--text);
 }
 .meal-dropdown-item.used-elsewhere {
   color: var(--text-light);
@@ -876,25 +911,28 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   text-align: center;
 }
 .planner-day-meal .suggest-btn {
-  background: var(--primary-light);
+  background: var(--primary-dark);
   color: white;
-  border: none;
+  border: 0.8px solid var(--primary-dark);
   padding: 0.4rem 0.75rem;
-  border-radius: var(--radius);
+  border-radius: var(--r-btn);
   cursor: pointer;
   font-size: 0.8rem;
   white-space: nowrap;
+  transition: opacity 0.15s;
 }
-.planner-day-meal .suggest-btn:hover { background: var(--primary); }
+.planner-day-meal .suggest-btn:hover { opacity: 0.82; }
 .planner-day-meal .clear-btn {
-  background: var(--border);
+  background: transparent;
   color: var(--text);
-  border: none;
+  border: 0.8px solid var(--text);
   padding: 0.4rem 0.6rem;
-  border-radius: var(--radius);
+  border-radius: var(--r-btn);
   cursor: pointer;
   font-size: 0.8rem;
+  transition: background 0.15s;
 }
+.planner-day-meal .clear-btn:hover { background: var(--bg-yellow-mid); }
 
 .planner-day-sides {
   margin-top: 0.5rem;
@@ -957,17 +995,18 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 .plan-day-card {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1rem 1.25rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 .plan-day-card .day-name {
-  font-weight: 700;
+  font-family: var(--font-serif);
+  font-weight: 500;
   min-width: 90px;
-  color: var(--primary-dark);
+  color: var(--text);
 }
 .plan-day-card .meal-name {
   flex: 1;
@@ -1009,15 +1048,16 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 /* Welcome card (new user onboarding) */
 .welcome-card {
   background: var(--card);
-  border: 2px solid var(--primary);
-  border-radius: var(--radius);
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-card);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
   text-align: center;
-  box-shadow: var(--shadow);
 }
 .welcome-card h3 {
-  color: var(--primary-dark);
+  font-family: var(--font-serif);
+  font-weight: 500;
+  color: var(--text);
   margin-bottom: 0.25rem;
 }
 .welcome-card > p {
@@ -1174,9 +1214,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 /* Aggregated checklist */
 #grocery-checklist {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1.25rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
   margin-bottom: 1rem;
 }
 .grocery-progress {
@@ -1210,13 +1250,14 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   margin-bottom: 0;
 }
 .grocery-category-label {
-  font-size: 0.75rem;
+  font-size: 10px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--primary);
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
   margin-bottom: 0.4rem;
   padding-bottom: 0.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.8px solid var(--border);
 }
 .grocery-checklist-items {
   list-style: none;
@@ -1314,15 +1355,16 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 /* Extra items */
 .grocery-extras-section {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1.25rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
   margin-bottom: 1rem;
 }
 .grocery-extras-label {
+  font-family: var(--font-serif);
   font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--primary-dark);
+  font-weight: 500;
+  color: var(--text);
   margin-bottom: 0.5rem;
 }
 .grocery-extras-add {
@@ -1385,16 +1427,17 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 }
 .grocery-day {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1rem 1.25rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
   margin-bottom: 0.75rem;
 }
 .grocery-day h3 {
-  font-size: 0.85rem;
+  font-size: 10px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--primary-dark);
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
   margin-bottom: 0.35rem;
 }
 .grocery-meal-name {
@@ -1429,9 +1472,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 /* === Manage === */
 .manage-section {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1.5rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
   max-width: 600px;
   margin-bottom: 1.5rem;
 }
@@ -1869,7 +1912,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   padding: 0.6rem 1rem;
   background: var(--card);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
   margin-bottom: 0.4rem;
 }
 .manage-recipe-name {
@@ -1946,6 +1989,71 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   margin-bottom: 1rem;
   line-height: 1.5;
 }
+
+/* === Use-Up Panel === */
+.use-up-panel {
+  background: var(--card);
+  border-radius: var(--r-card);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 0.8px solid var(--border);
+  border-left: 3px solid var(--green-mid);
+}
+.use-up-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.use-up-hint {
+  color: var(--text-faint);
+  font-size: 0.82rem;
+}
+.use-up-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.use-up-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--primary-light);
+  color: #1A3D2B;
+  border: 0.8px solid var(--green-mid);
+  border-radius: var(--r-pill);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.use-up-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+  padding: 0 0.15rem;
+}
+.use-up-remove:hover { opacity: 1; }
+.use-up-add {
+  display: flex;
+  gap: 0.5rem;
+}
+.use-up-input {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 0.8px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+.use-up-add-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: var(--r-btn);
+}
 .planner-actions {
   display: flex;
   gap: 0.75rem;
@@ -1968,9 +2076,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 }
 .feedback-card {
   background: var(--card);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 1rem 1.25rem;
-  box-shadow: var(--shadow);
+  border: 0.8px solid var(--border);
   margin-bottom: 0.75rem;
 }
 .feedback-card-header {
@@ -1998,26 +2106,28 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 /* === Buttons === */
 .btn {
   padding: 0.5rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: white;
+  border: 0.8px solid var(--primary-dark);
+  border-radius: var(--r-btn);
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
+  font-family: var(--font-sans);
   font-size: 0.9rem;
   transition: all 0.15s;
 }
-.btn:hover { background: var(--bg); }
+.btn:hover { background: var(--bg-yellow-mid); }
 .btn.primary {
+  background: var(--primary-dark);
+  color: white;
+  border-color: var(--primary-dark);
+}
+.btn.primary:hover { opacity: 0.82; background: var(--primary-dark); }
+.btn.commit {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
 }
-.btn.primary:hover { background: var(--primary-dark); }
-.btn.commit {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-}
-.btn.commit:hover { background: #d45a3e; }
+.btn.commit:hover { opacity: 0.82; }
 
 /* === Toast === */
 .toast {
@@ -2027,12 +2137,14 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   transform: translateX(-50%);
   background: var(--primary-dark);
   color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius);
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--r-pill);
   z-index: 300;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-  transition: opacity 0.3s;
+  transition: opacity 0.25s;
+  white-space: nowrap;
 }
 .toast.hidden { opacity: 0; pointer-events: none; }
 
