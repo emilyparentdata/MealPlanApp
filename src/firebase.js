@@ -428,3 +428,43 @@ export async function saveUseUpItems(weekKey, items) {
   await col('useUpItems').doc(weekKey).set({ items, updated: Date.now() });
 }
 
+// === Shared Recipe Packs ===
+
+export async function createSharedPack(name, recipes) {
+  if (!firebaseEnabled) throw new Error('Firebase required for sharing');
+
+  const code = generateInviteCode();
+  const packRecipes = recipes.map(r => ({
+    name: r.name || '',
+    ingredients: r.ingredients || '',
+    directions: r.directions || '',
+    servings: r.servings || '',
+    prep_time: r.prep_time || '',
+    cook_time: r.cook_time || '',
+    total_time: r.total_time || '',
+    categories: r.categories || [],
+    source: r.source || '',
+    source_url: r.source_url || '',
+    description: r.description || '',
+    notes: r.notes || '',
+    image_url: r.image_url || '',
+  }));
+
+  await db.collection('sharedPacks').doc(code).set({
+    name,
+    recipes: packRecipes,
+    createdBy: householdId,
+    createdAt: Date.now(),
+  });
+
+  return code;
+}
+
+export async function loadSharedPack(code) {
+  if (!firebaseEnabled) throw new Error('Firebase required for sharing');
+
+  const doc = await db.collection('sharedPacks').doc(code.toUpperCase().trim()).get();
+  if (!doc.exists) throw new Error('Pack not found. Check the code and try again.');
+  return doc.data();
+}
+

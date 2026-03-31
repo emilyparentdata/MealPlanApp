@@ -340,6 +340,88 @@ Rules:
   }
 });
 
+// === Parse Recipe from Pasted Text ===
+
+exports.parseRecipeText = functions.runWith({ secrets: ["ANTHROPIC_API_KEY"] }).https.onCall(async (data, context) => {
+  const { text } = data;
+
+  if (!text || !text.trim()) {
+    throw new functions.https.HttpsError("invalid-argument", "Recipe text is required");
+  }
+
+  if (text.length > 20000) {
+    throw new functions.https.HttpsError("invalid-argument", "Text is too long. Please paste just the recipe.");
+  }
+
+  try {
+    const client = new Anthropic();
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      messages: [
+        {
+          role: "user",
+          content: `Extract the recipe from this text. Return ONLY a JSON object with these fields:
+{
+  "name": "Recipe title",
+  "ingredients": "Each ingredient on its own line, including quantities",
+  "directions": "Each step on its own line, numbered",
+  "servings": "Number of servings if shown",
+  "prep_time": "Prep time if shown",
+  "cook_time": "Cook time if shown",
+  "categories": ["array", "of", "categories"],
+  "notes": "Any extra notes from the recipe"
+}
+
+Rules:
+- Include exact quantities and measurements for ingredients
+- Keep ingredient lines simple: "2 cups flour" not "2 cups all-purpose flour, sifted (see note 3)"
+- Number the direction steps
+- If a field isn't in the text, use an empty string or empty array
+- Return ONLY the JSON object, no other text
+
+Here is the recipe text:
+
+${text}`,
+        },
+      ],
+    });
+
+    const responseText = response.content[0].text.trim();
+
+    let jsonStr = responseText;
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1].trim();
+    }
+
+    const recipe = JSON.parse(jsonStr);
+
+    if (!recipe.name) {
+      throw new functions.https.HttpsError("not-found", "Couldn't find a recipe in that text. Try pasting just the recipe.");
+    }
+
+    return {
+      name: recipe.name || "",
+      ingredients: recipe.ingredients || "",
+      directions: recipe.directions || "",
+      servings: recipe.servings || "",
+      prep_time: recipe.prep_time || "",
+      cook_time: recipe.cook_time || "",
+      categories: recipe.categories || [],
+      notes: recipe.notes || "",
+      source: "Pasted text",
+    };
+  } catch (err) {
+    if (err instanceof functions.https.HttpsError) throw err;
+    if (err instanceof SyntaxError) {
+      throw new functions.https.HttpsError("internal", "Couldn't parse a recipe from that text. Try reformatting it.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to parse recipe: " + err.message);
+  }
+});
+
 // Fallback: scan page HTML for ingredient/direction sections
 function extractFromContent($) {
   let ingredients = "";

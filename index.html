@@ -175,9 +175,11 @@
         <div class="add-recipe-tabs">
           <button class="add-tab active" data-tab="tab-scan">Scan Photo</button>
           <button class="add-tab" data-tab="tab-url">From URL</button>
+          <button class="add-tab" data-tab="tab-paste">Paste Text</button>
           <button class="add-tab" data-tab="tab-manual">Manual</button>
           <button class="add-tab" data-tab="tab-import">Import File</button>
-          <button class="add-tab" data-tab="tab-starters">Try Sample Recipes</button>
+          <button class="add-tab" data-tab="tab-shared">Shared Packs</button>
+          <button class="add-tab" data-tab="tab-starters">Sample Recipes</button>
         </div>
 
         <!-- Tab: Scan -->
@@ -234,6 +236,26 @@
           <div id="url-import-error" class="hidden"></div>
         </div>
 
+        <!-- Tab: Paste Text -->
+        <div id="tab-paste" class="add-tab-content">
+          <p class="section-help">Copy a recipe from anywhere (NYT Cooking, a text message, email, website) and paste it below. We'll parse it into a structured recipe.</p>
+          <textarea id="paste-text-input" rows="10" placeholder="Paste your recipe text here...&#10;&#10;e.g.&#10;Honey Garlic Chicken&#10;&#10;Ingredients:&#10;4 chicken thighs&#10;3 tbsp honey&#10;2 tbsp soy sauce..."></textarea>
+          <button id="paste-parse-btn" class="btn primary" style="margin-top:0.5rem">Parse Recipe</button>
+          <div id="paste-preview" class="hidden">
+            <div id="paste-result"></div>
+            <div class="import-actions">
+              <button id="paste-save-btn" class="btn primary">Save This Recipe</button>
+              <button id="paste-edit-btn" class="btn">Edit First</button>
+              <button id="paste-cancel-btn" class="btn">Cancel</button>
+            </div>
+          </div>
+          <div id="paste-status" class="hidden" style="padding:1rem;text-align:center;color:var(--text-light);">
+            <div class="scan-spinner"></div>
+            <span>Parsing recipe...</span>
+          </div>
+          <div id="paste-error" class="hidden" style="color:#e53e3e;margin-top:0.75rem;"></div>
+        </div>
+
         <!-- Tab: Manual -->
         <div id="tab-manual" class="add-tab-content">
           <div id="add-recipe-form">
@@ -275,6 +297,42 @@
               <button id="import-confirm-btn" class="btn primary">Import All</button>
               <button id="import-cancel-btn" class="btn">Cancel</button>
             </div>
+          </div>
+        </div>
+
+        <!-- Tab: Shared Packs -->
+        <div id="tab-shared" class="add-tab-content">
+          <p class="section-help">Share your recipes with friends or import a recipe pack someone shared with you.</p>
+
+          <div class="shared-section">
+            <h4>Import a Shared Pack</h4>
+            <div class="shared-import-controls">
+              <input type="text" id="shared-code-input" placeholder="Enter share code (e.g. ABC123)" maxlength="6" style="text-transform:uppercase">
+              <button id="shared-load-btn" class="btn primary">Load Pack</button>
+            </div>
+            <div id="shared-preview" class="hidden">
+              <div id="shared-preview-content"></div>
+              <div class="import-actions">
+                <button id="shared-import-btn" class="btn primary">Import All</button>
+                <button id="shared-cancel-btn" class="btn">Cancel</button>
+              </div>
+            </div>
+            <div id="shared-import-error" class="hidden" style="color:#e53e3e;margin-top:0.75rem;"></div>
+          </div>
+
+          <hr style="margin:1.5rem 0;border-color:var(--border)">
+
+          <div class="shared-section">
+            <h4>Share Your Recipes</h4>
+            <p class="section-help">Select recipes below and create a shareable pack with a code anyone can use to import them.</p>
+            <input type="text" id="shared-pack-name" placeholder="Pack name (e.g. Our Family Favorites)">
+            <input type="text" id="shared-search" placeholder="Search your recipes..." style="margin-top:0.5rem">
+            <div id="shared-recipe-select" class="shared-recipe-grid"></div>
+            <div class="shared-create-actions">
+              <button id="shared-create-btn" class="btn primary">Create Shared Pack</button>
+              <span id="shared-select-count" class="shared-count">0 selected</span>
+            </div>
+            <div id="shared-create-result" class="hidden"></div>
           </div>
         </div>
 

@@ -855,8 +855,14 @@ function setupManagePage() {
   // URL import
   setupUrlImport();
 
+  // Paste text
+  setupPasteImport();
+
   // Photo scan
   setupScanImport();
+
+  // Shared packs
+  setupSharedPacks();
 }
 
 // === URL Import ===
@@ -972,6 +978,265 @@ function setupUrlImport() {
   document.getElementById('url-import-cancel-btn').addEventListener('click', () => {
     pendingUrlRecipe = null;
     document.getElementById('url-import-preview').classList.add('hidden');
+  });
+}
+
+// === Paste Text Import ===
+
+let pendingPasteRecipe = null;
+
+function setupPasteImport() {
+  const textInput = document.getElementById('paste-text-input');
+  const parseBtn = document.getElementById('paste-parse-btn');
+  const preview = document.getElementById('paste-preview');
+  const result = document.getElementById('paste-result');
+  const statusEl = document.getElementById('paste-status');
+  const errorEl = document.getElementById('paste-error');
+
+  parseBtn.addEventListener('click', async () => {
+    const text = textInput.value.trim();
+    if (!text) {
+      showToast('Please paste some recipe text first.');
+      return;
+    }
+
+    errorEl.classList.add('hidden');
+    preview.classList.add('hidden');
+    statusEl.classList.remove('hidden');
+    parseBtn.disabled = true;
+
+    try {
+      const parseRecipeText = firebase.functions().httpsCallable('parseRecipeText');
+      const response = await parseRecipeText({ text });
+      const recipe = response.data;
+
+      if (!recipe || !recipe.name) {
+        throw new Error("Couldn't find a recipe in that text.");
+      }
+
+      pendingPasteRecipe = {
+        uid: 'paste_' + Date.now(),
+        name: recipe.name || '',
+        ingredients: recipe.ingredients || '',
+        directions: recipe.directions || '',
+        servings: recipe.servings || '',
+        prep_time: recipe.prep_time || '',
+        cook_time: recipe.cook_time || '',
+        categories: recipe.categories || [],
+        source: recipe.source || 'Pasted text',
+        notes: recipe.notes || '',
+        rating: 0,
+      };
+
+      result.innerHTML = `
+        <div class="url-recipe-preview">
+          <h4>${escManage(recipe.name)}</h4>
+          <div class="preview-field">
+            ${recipe.prep_time ? `Prep: ${escManage(recipe.prep_time)}` : ''}
+            ${recipe.cook_time ? ` &middot; Cook: ${escManage(recipe.cook_time)}` : ''}
+            ${recipe.servings ? ` &middot; Serves: ${escManage(recipe.servings)}` : ''}
+          </div>
+          ${recipe.ingredients ? `<div class="preview-field"><strong>Ingredients</strong><div class="preview-content">${escManage(recipe.ingredients)}</div></div>` : ''}
+          ${recipe.directions ? `<div class="preview-field"><strong>Directions</strong><div class="preview-content">${escManage(recipe.directions)}</div></div>` : ''}
+        </div>
+      `;
+
+      statusEl.classList.add('hidden');
+      preview.classList.remove('hidden');
+    } catch (err) {
+      statusEl.classList.add('hidden');
+      errorEl.textContent = err.message || 'Failed to parse recipe.';
+      errorEl.classList.remove('hidden');
+    } finally {
+      parseBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('paste-save-btn').addEventListener('click', async () => {
+    if (!pendingPasteRecipe) return;
+    await saveRecipeToFirebase(pendingPasteRecipe);
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    refreshManageRecipeList();
+    showToast(`"${pendingPasteRecipe.name}" saved!`);
+    pendingPasteRecipe = null;
+    textInput.value = '';
+    preview.classList.add('hidden');
+  });
+
+  document.getElementById('paste-edit-btn').addEventListener('click', () => {
+    if (!pendingPasteRecipe) return;
+    document.getElementById('new-recipe-name').value = pendingPasteRecipe.name || '';
+    document.getElementById('new-recipe-ingredients').value = pendingPasteRecipe.ingredients || '';
+    document.getElementById('new-recipe-directions').value = pendingPasteRecipe.directions || '';
+    document.getElementById('new-recipe-servings').value = pendingPasteRecipe.servings || '';
+    document.getElementById('new-recipe-prep').value = pendingPasteRecipe.prep_time || '';
+    document.getElementById('new-recipe-cook').value = pendingPasteRecipe.cook_time || '';
+    document.getElementById('new-recipe-categories').value = (pendingPasteRecipe.categories || []).join(', ');
+    document.getElementById('new-recipe-source').value = pendingPasteRecipe.source || '';
+    document.getElementById('new-recipe-notes').value = pendingPasteRecipe.notes || '';
+
+    // Switch to manual tab
+    document.querySelectorAll('.add-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.add-tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-tab="tab-manual"]').classList.add('active');
+    document.getElementById('tab-manual').classList.add('active');
+
+    pendingPasteRecipe = null;
+    textInput.value = '';
+    preview.classList.add('hidden');
+    showToast('Recipe loaded into the form — edit and save when ready.');
+  });
+
+  document.getElementById('paste-cancel-btn').addEventListener('click', () => {
+    pendingPasteRecipe = null;
+    preview.classList.add('hidden');
+  });
+}
+
+// === Shared Recipe Packs ===
+
+function setupSharedPacks() {
+  const codeInput = document.getElementById('shared-code-input');
+  const loadBtn = document.getElementById('shared-load-btn');
+  const previewEl = document.getElementById('shared-preview');
+  const previewContent = document.getElementById('shared-preview-content');
+  const errorEl = document.getElementById('shared-import-error');
+  const searchInput = document.getElementById('shared-search');
+  const selectGrid = document.getElementById('shared-recipe-select');
+  const selectCount = document.getElementById('shared-select-count');
+  const createBtn = document.getElementById('shared-create-btn');
+  const createResult = document.getElementById('shared-create-result');
+  const packNameInput = document.getElementById('shared-pack-name');
+
+  let loadedPack = null;
+  let selectedUids = new Set();
+
+  // --- Import side ---
+
+  codeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadBtn.click();
+  });
+
+  loadBtn.addEventListener('click', async () => {
+    const code = codeInput.value.trim();
+    if (!code) { showToast('Enter a share code.'); return; }
+
+    errorEl.classList.add('hidden');
+    previewEl.classList.add('hidden');
+    loadBtn.textContent = 'Loading...';
+    loadBtn.disabled = true;
+
+    try {
+      const { loadSharedPack } = await import('./firebase.js');
+      loadedPack = await loadSharedPack(code);
+
+      previewContent.innerHTML = `
+        <h4>${escManage(loadedPack.name)}</h4>
+        <p>${loadedPack.recipes.length} recipe${loadedPack.recipes.length === 1 ? '' : 's'}</p>
+        <ul class="shared-recipe-list">
+          ${loadedPack.recipes.map(r => `<li>${escManage(r.name)}</li>`).join('')}
+        </ul>
+      `;
+      previewEl.classList.remove('hidden');
+    } catch (err) {
+      errorEl.textContent = err.message || 'Failed to load pack.';
+      errorEl.classList.remove('hidden');
+    } finally {
+      loadBtn.textContent = 'Load Pack';
+      loadBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('shared-import-btn').addEventListener('click', async () => {
+    if (!loadedPack) return;
+    const recipes = loadedPack.recipes.map(r => ({
+      ...r,
+      uid: 'shared_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    }));
+    await bulkSaveRecipes(recipes);
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    refreshManageRecipeList();
+    showToast(`Imported ${recipes.length} recipes from "${loadedPack.name}"!`);
+    loadedPack = null;
+    codeInput.value = '';
+    previewEl.classList.add('hidden');
+  });
+
+  document.getElementById('shared-cancel-btn').addEventListener('click', () => {
+    loadedPack = null;
+    previewEl.classList.add('hidden');
+  });
+
+  // --- Share side ---
+
+  function renderShareableRecipes(query) {
+    const recipes = filterRecipes(query || '');
+    selectGrid.innerHTML = recipes.map(r => `
+      <label class="shared-recipe-item ${selectedUids.has(r.uid) ? 'selected' : ''}">
+        <input type="checkbox" data-uid="${r.uid}" ${selectedUids.has(r.uid) ? 'checked' : ''}>
+        <span>${escManage(r.name)}</span>
+      </label>
+    `).join('');
+
+    selectGrid.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) selectedUids.add(cb.dataset.uid);
+        else selectedUids.delete(cb.dataset.uid);
+        cb.closest('.shared-recipe-item').classList.toggle('selected', cb.checked);
+        selectCount.textContent = `${selectedUids.size} selected`;
+      });
+    });
+
+    selectCount.textContent = `${selectedUids.size} selected`;
+  }
+
+  // Initial render
+  renderShareableRecipes('');
+  searchInput.addEventListener('input', () => renderShareableRecipes(searchInput.value));
+
+  createBtn.addEventListener('click', async () => {
+    const packName = packNameInput.value.trim();
+    if (!packName) { showToast('Give your pack a name.'); return; }
+    if (selectedUids.size === 0) { showToast('Select at least one recipe.'); return; }
+
+    createBtn.disabled = true;
+    createBtn.textContent = 'Creating...';
+
+    try {
+      const allRecipes = getRecipes();
+      const selected = allRecipes.filter(r => selectedUids.has(r.uid));
+      const { createSharedPack } = await import('./firebase.js');
+      const code = await createSharedPack(packName, selected);
+
+      createResult.innerHTML = `
+        <div class="shared-code-result">
+          <p>Pack created! Share this code:</p>
+          <div class="shared-code-display">
+            <strong>${code}</strong>
+            <button class="btn shared-copy-btn">Copy</button>
+          </div>
+          <p class="section-help">${selected.length} recipe${selected.length === 1 ? '' : 's'} in "${escManage(packName)}"</p>
+        </div>
+      `;
+      createResult.classList.remove('hidden');
+
+      createResult.querySelector('.shared-copy-btn').addEventListener('click', () => {
+        navigator.clipboard.writeText(code);
+        showToast('Code copied!');
+      });
+
+      // Reset selection
+      selectedUids.clear();
+      packNameInput.value = '';
+      renderShareableRecipes('');
+    } catch (err) {
+      showToast('Failed to create pack: ' + err.message);
+    } finally {
+      createBtn.disabled = false;
+      createBtn.textContent = 'Create Shared Pack';
+    }
   });
 }
 
