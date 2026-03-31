@@ -1990,6 +1990,21 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   line-height: 1.5;
 }
 
+.planner-setting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-light);
+}
+.planner-setting select {
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
 /* === Use-Up Panel === */
 .use-up-panel {
   background: var(--card);

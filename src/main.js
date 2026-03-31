@@ -1,4 +1,4 @@
-import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes } from './firebase.js';
+import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow } from './firebase.js';
 import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, getRecipePrefs } from './preferences.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
@@ -332,6 +332,13 @@ function setupPlannerPage() {
     shiftWeek(1);
     refreshPlanner();
   });
+  // Load saved repeat window setting
+  const repeatSelect = document.getElementById('repeat-window');
+  loadRepeatWindow().then(val => { repeatSelect.value = String(val); });
+  repeatSelect.addEventListener('change', () => {
+    saveRepeatWindow(parseInt(repeatSelect.value, 10));
+  });
+
   document.getElementById('suggest-all-btn').addEventListener('click', async () => {
     await suggestAllMeals(document.getElementById('planner-grid'), members);
     refreshPlanner();

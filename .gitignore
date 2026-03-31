@@ -1,3 +1,6 @@
 Inputs/
 .claude/
 functions/node_modules/
+dist/
+.firebase/
+.vite/

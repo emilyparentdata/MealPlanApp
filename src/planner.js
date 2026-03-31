@@ -1,6 +1,6 @@
 import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
-import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems } from './firebase.js';
+import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow } from './firebase.js';
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -70,7 +70,9 @@ function detectProtein(recipe) {
 
 // === Load recent weeks for overlap avoidance ===
 
-async function getRecentRecipeUids(weeksBack = 3) {
+async function getRecentRecipeUids(weeksBack) {
+  if (weeksBack === undefined) weeksBack = await loadRepeatWindow();
+  if (weeksBack === 0) weeksBack = 52; // "no limit" checks a full year
   const uids = new Set();
   for (let w = 1; w <= weeksBack; w++) {
     const d = new Date(currentWeekStart);

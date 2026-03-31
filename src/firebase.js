@@ -392,6 +392,24 @@ export async function saveGroceryExtras(items) {
   await col('settings').doc('groceryExtras').set({ items });
 }
 
+// === Repeat Window Setting ===
+
+export async function loadRepeatWindow() {
+  if (!firebaseEnabled || !householdId) {
+    return parseInt(localStorage.getItem('repeat_window') || '3', 10);
+  }
+  const doc = await col('settings').doc('repeatWindow').get();
+  return doc.exists ? (doc.data().weeks || 3) : 3;
+}
+
+export async function saveRepeatWindow(weeks) {
+  if (!firebaseEnabled || !householdId) {
+    localStorage.setItem('repeat_window', String(weeks));
+    return;
+  }
+  await col('settings').doc('repeatWindow').set({ weeks, updated: Date.now() });
+}
+
 // === Use-Up Items (ingredients to prioritize in meal planning) ===
 
 export async function loadUseUpItems(weekKey) {

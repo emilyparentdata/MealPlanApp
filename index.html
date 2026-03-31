@@ -93,6 +93,18 @@
         </div>
       </div>
       <p class="planner-instructions">Add any ingredients you want to use up, set who's home for each day, then hit <strong>Suggest Meals</strong>. The system picks a varied menu — prioritizing your use-up items and avoiding repeated proteins.</p>
+      <div class="planner-setting">
+        <label for="repeat-window">Avoid repeats from the last</label>
+        <select id="repeat-window">
+          <option value="1">1 week</option>
+          <option value="2">2 weeks</option>
+          <option value="3" selected>3 weeks</option>
+          <option value="4">4 weeks (1 month)</option>
+          <option value="6">6 weeks</option>
+          <option value="8">8 weeks (2 months)</option>
+          <option value="0">No limit (never repeat)</option>
+        </select>
+      </div>
       <div id="planner-grid"></div>
       <div class="planner-actions">
         <button id="suggest-all-btn" class="btn primary large">Suggest Meals</button>
