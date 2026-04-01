@@ -1150,7 +1150,49 @@ function setupSharedPacks() {
 
   document.getElementById('shared-import-btn').addEventListener('click', async () => {
     if (!loadedPack) return;
-    const recipes = loadedPack.recipes.map(r => ({
+
+    // Check for duplicates by name
+    const existingNames = new Set(getRecipes().map(r => r.name.trim().toLowerCase()));
+    const dupes = loadedPack.recipes.filter(r => existingNames.has(r.name.trim().toLowerCase()));
+    const newOnly = loadedPack.recipes.filter(r => !existingNames.has(r.name.trim().toLowerCase()));
+
+    if (dupes.length > 0) {
+      const choice = await showSharedImportModal(
+        'Some recipes already exist',
+        `${dupes.length} of ${loadedPack.recipes.length} recipe${loadedPack.recipes.length === 1 ? '' : 's'} ${dupes.length === 1 ? 'is' : 'are'} already in your collection: ${dupes.map(r => `"${r.name}"`).join(', ')}.`,
+        newOnly.length > 0
+          ? [
+              { label: 'Import New Only', value: 'new', primary: true },
+              { label: 'Import All Anyway', value: 'all' },
+              { label: 'Cancel', value: 'cancel' },
+            ]
+          : [
+              { label: 'Import All Anyway', value: 'all' },
+              { label: 'Cancel', value: 'cancel' },
+            ]
+      );
+
+      if (choice === 'cancel') return;
+      const toImport = choice === 'new' ? newOnly : loadedPack.recipes;
+      if (toImport.length === 0) {
+        await showSharedImportModal('All set!', 'You already have all the recipes from this pack.', [{ label: 'OK', value: 'ok', primary: true }]);
+        loadedPack = null;
+        codeInput.value = '';
+        previewEl.classList.add('hidden');
+        return;
+      }
+      await doSharedImport(toImport, loadedPack.name);
+    } else {
+      await doSharedImport(loadedPack.recipes, loadedPack.name);
+    }
+
+    loadedPack = null;
+    codeInput.value = '';
+    previewEl.classList.add('hidden');
+  });
+
+  async function doSharedImport(recipesToImport, packName) {
+    const recipes = recipesToImport.map(r => ({
       ...r,
       uid: 'shared_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     }));
@@ -1158,11 +1200,12 @@ function setupSharedPacks() {
     await loadHouseholdRecipes();
     await loadRecipes();
     refreshManageRecipeList();
-    showToast(`Imported ${recipes.length} recipes from "${loadedPack.name}"!`);
-    loadedPack = null;
-    codeInput.value = '';
-    previewEl.classList.add('hidden');
-  });
+    await showSharedImportModal(
+      'Import complete!',
+      `${recipes.length} recipe${recipes.length === 1 ? '' : 's'} from "${packName}" added to your collection.`,
+      [{ label: 'OK', value: 'ok', primary: true }]
+    );
+  }
 
   document.getElementById('shared-cancel-btn').addEventListener('click', () => {
     loadedPack = null;
@@ -2147,6 +2190,35 @@ function confirmDelete(recipeName) {
 
     yesBtn.addEventListener('click', onYes);
     noBtn.addEventListener('click', onNo);
+    modal.addEventListener('click', onBackdrop);
+  });
+}
+
+// === Shared Import Modal ===
+function showSharedImportModal(title, message, buttons) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('shared-import-modal');
+    document.getElementById('shared-import-modal-title').textContent = title;
+    document.getElementById('shared-import-modal-msg').textContent = message;
+    const actionsEl = document.getElementById('shared-import-modal-actions');
+    actionsEl.innerHTML = buttons.map(b =>
+      `<button class="btn${b.primary ? ' primary' : ''}" data-value="${b.value}">${b.label}</button>`
+    ).join('');
+    modal.classList.remove('hidden');
+
+    function cleanup(value) {
+      modal.classList.add('hidden');
+      actionsEl.removeEventListener('click', onClick);
+      modal.removeEventListener('click', onBackdrop);
+      resolve(value);
+    }
+    function onClick(e) {
+      const btn = e.target.closest('[data-value]');
+      if (btn) cleanup(btn.dataset.value);
+    }
+    function onBackdrop(e) { if (e.target === modal) cleanup('cancel'); }
+
+    actionsEl.addEventListener('click', onClick);
     modal.addEventListener('click', onBackdrop);
   });
 }
