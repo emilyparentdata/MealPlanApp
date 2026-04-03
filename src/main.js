@@ -2223,14 +2223,14 @@ function setupEditModal() {
 }
 
 async function showDayPicker(recipe, anchorEl, onDone) {
-  // Reuse or create a picker element anchored to the button
-  let picker = anchorEl.parentElement.querySelector('.day-picker');
+  // Use a single shared picker appended to body to avoid card click propagation issues
+  let picker = document.getElementById('global-day-picker');
   if (!picker) {
     picker = document.createElement('div');
+    picker.id = 'global-day-picker';
     picker.className = 'day-picker hidden';
     picker.addEventListener('click', (e) => e.stopPropagation());
-    anchorEl.parentElement.style.position = 'relative';
-    anchorEl.parentElement.appendChild(picker);
+    document.body.appendChild(picker);
   }
 
   // Track which week is shown; start from the planner's current week
@@ -2277,14 +2277,18 @@ async function showDayPicker(recipe, anchorEl, onDone) {
 
       dayBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!plan.days[dayName]) plan.days[dayName] = {};
-        plan.days[dayName].recipeUid = recipe.uid;
-        plan.weekKey = weekKey;
-        plan.updated = Date.now();
-        await savePlan(weekKey, plan);
-        picker.classList.add('hidden');
-        showToast(`"${recipe.name}" added to ${dayName}!`);
-        if (onDone) onDone();
+        try {
+          if (!plan.days[dayName]) plan.days[dayName] = {};
+          plan.days[dayName].recipeUid = recipe.uid;
+          plan.weekKey = weekKey;
+          plan.updated = Date.now();
+          await savePlan(weekKey, plan);
+          picker.classList.add('hidden');
+          showToast(`"${recipe.name}" added to ${dayName}!`);
+          if (onDone) onDone();
+        } catch (err) {
+          showToast('Failed to add to plan: ' + err.message);
+        }
       });
 
       picker.appendChild(dayBtn);
@@ -2298,6 +2302,12 @@ async function showDayPicker(recipe, anchorEl, onDone) {
   }
 
   await renderPickerWeek();
+
+  // Position near the anchor button
+  const rect = anchorEl.getBoundingClientRect();
+  picker.style.position = 'fixed';
+  picker.style.left = rect.left + 'px';
+  picker.style.top = (rect.bottom + 4) + 'px';
   picker.classList.remove('hidden');
 }
 
@@ -2312,9 +2322,9 @@ function setupAddToPlan() {
     });
   });
 
-  // Close any open day-pickers when clicking outside
+  // Close day picker when clicking outside
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.add-to-plan-wrap') && !e.target.closest('.day-picker') && !e.target.closest('.plan-btn')) {
+    if (!e.target.closest('.add-to-plan-wrap') && !e.target.closest('.day-picker') && !e.target.closest('#global-day-picker') && !e.target.closest('.plan-btn')) {
       document.querySelectorAll('.day-picker').forEach(p => p.classList.add('hidden'));
     }
   });
