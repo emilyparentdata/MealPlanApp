@@ -59,10 +59,16 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       const label = a.charAt(0).toUpperCase() + a.slice(1);
       return `<span class="allergen-chip${hasConflict ? ' conflict' : ''}">${esc(label)}</span>`;
     }).join('');
+    // Diet category chips
+    const dietChips = (r.dietCategories || []).map(d => {
+      const label = d.charAt(0).toUpperCase() + d.slice(1);
+      return `<span class="allergen-chip diet">${esc(label)}</span>`;
+    }).join('');
+    const allChips = allergenChips + dietChips;
 
     card.innerHTML = `
       <h3 class="recipe-card-name">${esc(r.name)}</h3>
-      ${allergenChips ? `<div class="allergen-chips">${allergenChips}</div>` : ''}
+      ${allChips ? `<div class="allergen-chips">${allChips}</div>` : ''}
       <div class="card-actions">${actions.join('')}</div>
       <details class="card-detail family-prefs-detail">
         <summary>Family Preferences</summary>

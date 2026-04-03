@@ -7,7 +7,8 @@ import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, a
 
 // === State ===
 const BETA_CODE = 'MEALS2026';
-const ALLERGENS = ['Dairy', 'Gluten', 'Tree Nuts', 'Peanuts', 'Eggs', 'Soy', 'Shellfish', 'Fish', 'Sesame', 'Vegetarian', 'Vegan'];
+const ALLERGENS = ['Dairy', 'Gluten', 'Tree Nuts', 'Peanuts', 'Eggs', 'Soy', 'Shellfish', 'Fish', 'Sesame'];
+const DIET_CATEGORIES = ['Vegetarian', 'Vegan'];
 let members = [];
 let appInitialized = false;
 
@@ -339,9 +340,12 @@ function setupHouseholdSettings() {
           ${ALLERGENS.map(a => {
             const key = a.toLowerCase();
             const active = memberRestrictions.includes(key) ? ' active' : '';
-            const isLifestyle = (a === 'Vegetarian' || a === 'Vegan');
-            const label = isLifestyle ? a : `${a}-free`;
-            return `<button class="restriction-pill${active}" data-allergen="${escAttr(key)}">${escManage(label)}</button>`;
+            return `<button class="restriction-pill${active}" data-allergen="${escAttr(key)}">${escManage(a)}-free</button>`;
+          }).join('')}
+          ${DIET_CATEGORIES.map(a => {
+            const key = a.toLowerCase();
+            const active = memberRestrictions.includes(key) ? ' active' : '';
+            return `<button class="restriction-pill diet${active}" data-allergen="${escAttr(key)}">${escManage(a)}</button>`;
           }).join('')}
         </div>
       `;
@@ -2120,9 +2124,11 @@ function setupEditModal() {
       return;
     }
 
-    // Collect active allergen toggles
+    // Collect active allergen and diet toggles
     const allergens = [...document.querySelectorAll('#edit-recipe-allergens .allergen-toggle.active')]
       .map(btn => btn.dataset.allergen);
+    const dietCategories = [...document.querySelectorAll('#edit-recipe-diet .allergen-toggle.active')]
+      .map(btn => btn.dataset.diet);
 
     const updated = {
       ...currentEditRecipe,
@@ -2137,6 +2143,7 @@ function setupEditModal() {
       source: document.getElementById('edit-recipe-source').value,
       notes: document.getElementById('edit-recipe-notes').value,
       allergens,
+      dietCategories,
     };
 
     await saveRecipeToFirebase(updated);
@@ -2297,10 +2304,19 @@ function openEditModal(recipe) {
     return `<button type="button" class="allergen-toggle${active}" data-allergen="${escAttr(key)}">${escManage(a)}</button>`;
   }).join('');
   allergensContainer.querySelectorAll('.allergen-toggle').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      btn.classList.toggle('active');
-    });
+    btn.addEventListener('click', (e) => { e.preventDefault(); btn.classList.toggle('active'); });
+  });
+
+  // Dietary category toggles
+  const dietContainer = document.getElementById('edit-recipe-diet');
+  const recipeDiet = recipe.dietCategories || [];
+  dietContainer.innerHTML = DIET_CATEGORIES.map(a => {
+    const key = a.toLowerCase();
+    const active = recipeDiet.includes(key) ? ' active' : '';
+    return `<button type="button" class="allergen-toggle${active}" data-diet="${escAttr(key)}">${escManage(a)}</button>`;
+  }).join('');
+  dietContainer.querySelectorAll('.allergen-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.preventDefault(); btn.classList.toggle('active'); });
   });
 
   document.getElementById('edit-recipe-modal').classList.remove('hidden');

@@ -274,19 +274,27 @@ export async function renderPlanner(container, members) {
       const uid = combo?.dataset.recipeUid;
       if (!uid) return;
       const recipe = recipes.find(r => r.uid === uid);
-      if (!recipe?.allergens?.length) return;
+      if (!recipe) return;
+      const recipeAllergens = recipe.allergens || [];
+      const recipeDiet = recipe.dietCategories || [];
       const restrictions = getRestrictions();
       const homeMembers = [...dayEl.querySelectorAll('.who-home input[type="checkbox"]:checked')]
         .map(cb => cb.dataset.member);
       const warnings = [];
       for (const member of homeMembers) {
         const memberRestrictions = restrictions[member] || [];
-        for (const allergen of recipe.allergens) {
+        // Check allergen conflicts (dairy, gluten, etc.)
+        for (const allergen of recipeAllergens) {
           if (memberRestrictions.includes(allergen)) {
             const label = allergen.charAt(0).toUpperCase() + allergen.slice(1);
-            const isLifestyle = (allergen === 'vegetarian' || allergen === 'vegan');
-            const desc = isLifestyle ? label : `${label}-free`;
-            warnings.push(`Contains ${label} \u2014 ${member} is ${desc}`);
+            warnings.push(`Contains ${label} \u2014 ${member} is ${label}-free`);
+          }
+        }
+        // Check diet conflicts (member is vegetarian but recipe isn't tagged as such)
+        for (const diet of ['vegetarian', 'vegan']) {
+          if (memberRestrictions.includes(diet) && !recipeDiet.includes(diet)) {
+            const label = diet.charAt(0).toUpperCase() + diet.slice(1);
+            warnings.push(`Not tagged ${label} \u2014 ${member} is ${label}`);
           }
         }
       }

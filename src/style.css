@@ -708,6 +708,11 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   border-color: var(--love);
   font-weight: 500;
 }
+.restriction-pill.diet.active {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--green-mid);
+}
 
 /* Allergen pills on recipe edit form */
 .allergen-toggles {
@@ -758,6 +763,11 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   background: #fde8e8;
   color: var(--love);
   border-color: var(--love);
+}
+.allergen-chip.diet {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--green-mid);
 }
 
 /* Allergen warning in planner */
