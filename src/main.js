@@ -1081,17 +1081,24 @@ function setupUrlImport() {
 
   document.getElementById('url-import-save-btn').addEventListener('click', async () => {
     if (!pendingUrlRecipe) return;
-
-    await saveRecipeToFirebase(pendingUrlRecipe);
-    await loadHouseholdRecipes();
-    await loadRecipes();
-    refreshManageRecipeList();
-    showToast(`"${pendingUrlRecipe.name}" saved!`);
-
-    // Reset
-    pendingUrlRecipe = null;
-    input.value = '';
-    preview.classList.add('hidden');
+    const saveBtn = document.getElementById('url-import-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    try {
+      await saveRecipeToFirebase(pendingUrlRecipe);
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      refreshManageRecipeList();
+      showToast(`"${pendingUrlRecipe.name}" saved!`);
+      pendingUrlRecipe = null;
+      input.value = '';
+      preview.classList.add('hidden');
+    } catch (err) {
+      showToast('Save failed: ' + err.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save This Recipe';
+    }
   });
 
   document.getElementById('url-import-cancel-btn').addEventListener('click', () => {
@@ -1173,14 +1180,24 @@ function setupPasteImport() {
 
   document.getElementById('paste-save-btn').addEventListener('click', async () => {
     if (!pendingPasteRecipe) return;
-    await saveRecipeToFirebase(pendingPasteRecipe);
-    await loadHouseholdRecipes();
-    await loadRecipes();
-    refreshManageRecipeList();
-    showToast(`"${pendingPasteRecipe.name}" saved!`);
-    pendingPasteRecipe = null;
-    textInput.value = '';
-    preview.classList.add('hidden');
+    const saveBtn = document.getElementById('paste-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    try {
+      await saveRecipeToFirebase(pendingPasteRecipe);
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      refreshManageRecipeList();
+      showToast(`"${pendingPasteRecipe.name}" saved!`);
+      pendingPasteRecipe = null;
+      textInput.value = '';
+      preview.classList.add('hidden');
+    } catch (err) {
+      showToast('Save failed: ' + err.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save This Recipe';
+    }
   });
 
   document.getElementById('paste-edit-btn').addEventListener('click', () => {
@@ -1645,12 +1662,22 @@ function setupScanImport() {
   // Save directly (single)
   document.getElementById('scan-save-btn').addEventListener('click', async () => {
     if (!pendingScanRecipe) return;
-    await saveRecipeToFirebase(pendingScanRecipe);
-    await loadHouseholdRecipes();
-    await loadRecipes();
-    refreshManageRecipeList();
-    showToast(`"${pendingScanRecipe.name}" saved!`);
-    resetScan();
+    const saveBtn = document.getElementById('scan-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    try {
+      await saveRecipeToFirebase(pendingScanRecipe);
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      refreshManageRecipeList();
+      showToast(`"${pendingScanRecipe.name}" saved!`);
+      resetScan();
+    } catch (err) {
+      showToast('Save failed: ' + err.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save This Recipe';
+    }
   });
 
   // Edit first — pre-fill the manual form (single only)
