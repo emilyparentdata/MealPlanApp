@@ -2228,6 +2228,7 @@ async function showDayPicker(recipe, anchorEl, onDone) {
   if (!picker) {
     picker = document.createElement('div');
     picker.className = 'day-picker hidden';
+    picker.addEventListener('click', (e) => e.stopPropagation());
     anchorEl.parentElement.style.position = 'relative';
     anchorEl.parentElement.appendChild(picker);
   }
@@ -2274,7 +2275,8 @@ async function showDayPicker(recipe, anchorEl, onDone) {
         dayBtn.innerHTML = `<span class="day-picker-day">${dayName} <small>${shortDate}</small></span><span class="day-picker-current empty">No meal planned</span>`;
       }
 
-      dayBtn.addEventListener('click', async () => {
+      dayBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (!plan.days[dayName]) plan.days[dayName] = {};
         plan.days[dayName].recipeUid = recipe.uid;
         plan.weekKey = weekKey;
