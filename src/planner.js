@@ -1,6 +1,6 @@
 import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
-import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, loadCommittedPlan, getRestrictions } from './firebase.js';
+import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, getRestrictions } from './firebase.js';
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -143,75 +143,6 @@ export async function renderPlanner(container, members) {
       renderPlanner(container, members);
     });
   });
-
-  // Rollover: check if this week is empty and last week had unused meals
-  const hasAnyMeals = Object.values(plan.days).some(d => d.recipeUid);
-  if (!hasAnyMeals) {
-    const prevWeekStart = new Date(currentWeekStart);
-    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
-    const prevWeekKey = prevWeekStart.toISOString().slice(0, 10);
-    const prevPlan = await loadCommittedPlan(prevWeekKey);
-    if (prevPlan?.days) {
-      const unusedMeals = [];
-      for (const day of DAYS) {
-        const d = prevPlan.days[day];
-        if (d?.recipeUid && d.skip !== true && d.skip !== 'skip' && d.skip !== 'leftovers') {
-          const recipe = getRecipeByUid(d.recipeUid);
-          if (recipe) unusedMeals.push(recipe);
-        }
-      }
-      // Deduplicate by uid
-      const seen = new Set();
-      const unique = unusedMeals.filter(r => {
-        if (seen.has(r.uid)) return false;
-        seen.add(r.uid);
-        return true;
-      });
-
-      if (unique.length > 0) {
-        const rolloverEl = document.createElement('div');
-        rolloverEl.className = 'rollover-panel';
-        rolloverEl.innerHTML = `
-          <div class="rollover-header">
-            <strong>Carry forward from last week?</strong>
-            <span class="rollover-hint">These meals were on last week's plan — add any you'd like to keep.</span>
-          </div>
-          <div class="rollover-items">
-            ${unique.map(r => `<button class="rollover-btn" data-uid="${escAttr(r.uid)}">${escHtml(r.name)}</button>`).join('')}
-          </div>
-          <button class="rollover-dismiss">Dismiss</button>
-        `;
-
-        rolloverEl.querySelectorAll('.rollover-btn').forEach(btn => {
-          btn.addEventListener('click', async () => {
-            const uid = btn.dataset.uid;
-            // Find the first empty cooking day and assign this recipe
-            for (const day of DAYS) {
-              const d = plan.days[day] || {};
-              if (!d.recipeUid && d.skip !== true && d.skip !== 'skip' && d.skip !== 'leftovers') {
-                if (!plan.days[day]) plan.days[day] = {};
-                plan.days[day].recipeUid = uid;
-                plan.weekKey = weekKey;
-                plan.updated = Date.now();
-                await savePlan(weekKey, plan);
-                btn.classList.add('added');
-                btn.textContent += ' \u2713';
-                btn.disabled = true;
-                renderPlanner(container, members);
-                return;
-              }
-            }
-          });
-        });
-
-        rolloverEl.querySelector('.rollover-dismiss').addEventListener('click', () => {
-          rolloverEl.remove();
-        });
-
-        container.appendChild(rolloverEl);
-      }
-    }
-  }
 
   // Step 1: Constraint cards for each day
   for (let i = 0; i < 7; i++) {
