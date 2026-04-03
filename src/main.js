@@ -1119,6 +1119,10 @@ function setupPasteImport() {
   const statusEl = document.getElementById('paste-status');
   const errorEl = document.getElementById('paste-error');
 
+  textInput.addEventListener('focus', () => {
+    statusEl.classList.add('hidden');
+  });
+
   parseBtn.addEventListener('click', async () => {
     const text = textInput.value.trim();
     if (!text) {
@@ -1167,13 +1171,12 @@ function setupPasteImport() {
         </div>
       `;
 
-      statusEl.classList.add('hidden');
       preview.classList.remove('hidden');
     } catch (err) {
-      statusEl.classList.add('hidden');
       errorEl.textContent = err.message || 'Failed to parse recipe.';
       errorEl.classList.remove('hidden');
     } finally {
+      statusEl.classList.add('hidden');
       parseBtn.disabled = false;
     }
   });
