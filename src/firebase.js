@@ -202,6 +202,37 @@ export function setMembers(members) {
   updateHouseholdMembers(members);
 }
 
+// === Dietary Restrictions (per member, stored on household) ===
+
+let _cachedRestrictions = {};
+
+export async function loadRestrictions() {
+  if (!householdId || !firebaseEnabled) {
+    const saved = localStorage.getItem("dietary_restrictions");
+    _cachedRestrictions = saved ? JSON.parse(saved) : {};
+    return _cachedRestrictions;
+  }
+  const doc = await db.collection('households').doc(householdId).get();
+  if (doc.exists) {
+    _cachedRestrictions = doc.data().restrictions || {};
+    return _cachedRestrictions;
+  }
+  return {};
+}
+
+export function getRestrictions() {
+  return _cachedRestrictions;
+}
+
+export async function saveRestrictions(restrictions) {
+  _cachedRestrictions = restrictions;
+  if (!householdId || !firebaseEnabled) {
+    localStorage.setItem("dietary_restrictions", JSON.stringify(restrictions));
+    return;
+  }
+  await db.collection('households').doc(householdId).update({ restrictions });
+}
+
 // === Preferences (per recipe, not per member) ===
 
 export async function saveRecipePrefs(recipeUid, prefs) {

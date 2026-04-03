@@ -29,14 +29,14 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
     container.innerHTML = '<p style="color:var(--text-light);padding:2rem;">No recipes found.</p>';
     return;
   }
-  const { onEdit, onDelete, onToggleFavorite, onAddToPlan, onToggleDoesntEat, onToggleMakeAhead, members } = callbacks;
+  const { onEdit, onDelete, onToggleFavorite, onAddToPlan, onToggleDoesntEat, onToggleMakeAhead, members, restrictions } = callbacks;
 
   for (const r of recipes) {
     const card = document.createElement('div');
-    card.className = 'recipe-card';
     card.dataset.uid = r.uid;
 
     const pref = preferences?.[r.uid] || {};
+    card.className = 'recipe-card' + (pref.favorite ? ' is-favorite' : '');
     const isFav = pref.favorite;
     const isMakeAhead = pref.makeAhead;
     const doesntEat = pref.doesntEat || [];
@@ -44,7 +44,6 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
     // Action buttons row
     const actions = [];
     if (onEdit) actions.push(`<button class="card-action-btn edit-btn" title="Edit">Edit</button>`);
-    if (onDelete) actions.push(`<button class="card-action-btn delete-btn" title="Delete">Delete</button>`);
     actions.push(`<button class="card-action-btn fav-action-btn${isFav ? ' active' : ''}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '\u2764 Favorite' : '\u2661 Favorite'}</button>`);
     if (onAddToPlan) actions.push(`<button class="card-action-btn plan-btn" title="Add to Plan">Add to Plan</button>`);
 
@@ -54,8 +53,16 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       return `<button class="pref-member-btn${active}" data-member="${esc(m)}">${esc(m)}</button>`;
     }).join('');
 
+    // Allergen chips
+    const allergenChips = (r.allergens || []).map(a => {
+      const hasConflict = restrictions && Object.values(restrictions).some(arr => arr.includes(a));
+      const label = a.charAt(0).toUpperCase() + a.slice(1);
+      return `<span class="allergen-chip${hasConflict ? ' conflict' : ''}">${esc(label)}</span>`;
+    }).join('');
+
     card.innerHTML = `
       <h3 class="recipe-card-name">${esc(r.name)}</h3>
+      ${allergenChips ? `<div class="allergen-chips">${allergenChips}</div>` : ''}
       <div class="card-actions">${actions.join('')}</div>
       <details class="card-detail family-prefs-detail">
         <summary>Family Preferences</summary>
@@ -70,6 +77,7 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
           <button class="pref-flag-btn make-ahead-btn${isMakeAhead ? ' active' : ''}">Make Ahead</button>
         </div>
       </details>
+      ${onDelete ? '<button class="card-trash-btn" title="Delete recipe">&#128465;</button>' : ''}
     `;
 
     // Wire actions — stop propagation so card click (view detail) doesn't fire
@@ -77,7 +85,7 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       card.querySelector('.edit-btn').addEventListener('click', (e) => { e.stopPropagation(); onEdit(r); });
     }
     if (onDelete) {
-      card.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); onDelete(r); });
+      card.querySelector('.card-trash-btn').addEventListener('click', (e) => { e.stopPropagation(); onDelete(r); });
     }
 
     // Favorite
@@ -88,6 +96,7 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
         const nowFav = await onToggleFavorite(r.uid);
         favBtn.textContent = nowFav ? '\u2764 Favorite' : '\u2661 Favorite';
         favBtn.classList.toggle('active', nowFav);
+        card.classList.toggle('is-favorite', nowFav);
       });
     }
 

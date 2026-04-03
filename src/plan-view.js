@@ -4,6 +4,22 @@ import { getWeekKey, getWeekLabel } from './planner.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+function isCurrentWeek(weekKey) {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(now.getFullYear(), now.getMonth(), diff);
+  return weekKey === monday.toISOString().slice(0, 10);
+}
+
+function isPastWeek(weekKey) {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(now.getFullYear(), now.getMonth(), diff);
+  return new Date(weekKey + 'T00:00:00') < monday;
+}
+
 export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride, weekLabelOverride, onMealClick, onFeedbackClick) {
   const weekKey = weekKeyOverride || getWeekKey();
   weekLabelEl.textContent = weekLabelOverride || getWeekLabel();
@@ -12,12 +28,31 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
   gridContainer.innerHTML = '';
 
   if (!plan || !plan.days) {
-    gridContainer.innerHTML = `
-      <div class="empty-state-card">
-        <p>No meal plan for this week yet.</p>
-        <button class="btn primary" data-navigate="planner">Plan This Week</button>
-      </div>
-    `;
+    const current = isCurrentWeek(weekKey);
+    const past = isPastWeek(weekKey);
+
+    if (current) {
+      gridContainer.innerHTML = `
+        <div class="smart-landing">
+          <h3>This week's meals aren't planned yet</h3>
+          <p>Set up your dinners for the week — it only takes a minute.</p>
+          <button class="btn primary large" data-navigate="planner">Plan This Week</button>
+        </div>
+      `;
+    } else if (past) {
+      gridContainer.innerHTML = `
+        <div class="empty-state-card">
+          <p>No meal plan was saved for this week.</p>
+        </div>
+      `;
+    } else {
+      gridContainer.innerHTML = `
+        <div class="empty-state-card">
+          <p>No meal plan for this week yet.</p>
+          <button class="btn primary" data-navigate="planner">Plan This Week</button>
+        </div>
+      `;
+    }
     return;
   }
 
@@ -50,7 +85,7 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
       <div class="meal-flags">
         ${flags.map(f => `<span class="flag-chip">${f}</span>`).join('')}
       </div>
-      ${recipe ? '<button class="feedback-btn">Feedback</button>' : ''}
+      ${recipe ? '<button class="feedback-btn">Notes</button>' : ''}
     `;
 
     if (recipe && onFeedbackClick) {

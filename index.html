@@ -77,6 +77,7 @@
     <div id="user-info">
       <span id="user-display-name"></span>
       <button id="invite-code-btn" class="sign-out-btn" title="Click to copy invite code">Invite: <span id="invite-code-display"></span></button>
+      <button id="household-settings-btn" class="sign-out-btn" title="Household settings">Settings</button>
       <button id="sign-out-btn" class="sign-out-btn">Sign Out</button>
     </div>
   </header>
@@ -87,9 +88,9 @@
       <div class="page-header">
         <h2>Plan the Week</h2>
         <div class="week-selector">
-          <button id="prev-week">&laquo; Prev</button>
+          <button id="prev-week">&laquo; Previous Week</button>
           <span id="week-label"></span>
-          <button id="next-week">Next &raquo;</button>
+          <button id="next-week">Next Week &raquo;</button>
         </div>
       </div>
       <p class="planner-instructions">Add any ingredients you want to use up, set who's home for each day, then hit <strong>Suggest Meals</strong>. The system picks a varied menu — prioritizing your use-up items and avoiding repeated proteins.</p>
@@ -119,9 +120,9 @@
       <div class="page-header">
         <h2>Meal Plan</h2>
         <div class="week-selector">
-          <button id="view-prev-week">&laquo; Prev</button>
+          <button id="view-prev-week">&laquo; Previous Week</button>
           <span id="view-week-label"></span>
-          <button id="view-next-week">Next &raquo;</button>
+          <button id="view-next-week">Next Week &raquo;</button>
         </div>
       </div>
       <div class="plan-view-toolbar">
@@ -136,10 +137,15 @@
       <div class="page-header">
         <h2>Grocery List</h2>
         <div class="week-selector">
-          <button id="grocery-prev-week">&laquo; Prev</button>
+          <button id="grocery-prev-week">&laquo; Previous Week</button>
           <span id="grocery-week-label"></span>
-          <button id="grocery-next-week">Next &raquo;</button>
+          <button id="grocery-next-week">Next Week &raquo;</button>
         </div>
+      </div>
+      <div class="grocery-actions">
+        <button id="share-grocery-btn" class="btn primary">Share List</button>
+        <button id="copy-grocery-btn" class="btn">Copy to Clipboard</button>
+        <button id="clear-checked-btn" class="btn">Uncheck All</button>
       </div>
       <div id="grocery-checklist"></div>
       <div class="grocery-extras-section">
@@ -149,11 +155,6 @@
           <input type="text" id="grocery-extra-input" placeholder="Add an item (e.g. eggs, milk...)">
           <button id="add-extra-btn" class="btn primary">Add</button>
         </div>
-      </div>
-      <div class="grocery-actions">
-        <button id="share-grocery-btn" class="btn primary">Share List</button>
-        <button id="copy-grocery-btn" class="btn">Copy to Clipboard</button>
-        <button id="clear-checked-btn" class="btn">Uncheck All</button>
       </div>
       <details class="meal-breakdown">
         <summary>Meal-by-meal breakdown</summary>
@@ -377,7 +378,30 @@
     </div>
   </div>
 
-  <!-- Feedback Modal (per-meal on This Week) -->
+  <!-- Household Settings Modal -->
+  <div id="household-settings-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:480px;">
+      <button class="modal-close household-settings-close">&times;</button>
+      <h2>Household Settings</h2>
+      <div class="household-settings-body">
+        <label class="settings-label">Household Members</label>
+        <p class="settings-hint">These are the people who eat dinner in your household.</p>
+        <div id="household-member-list"></div>
+        <div class="household-add-member">
+          <input type="text" id="new-member-input" placeholder="Add a new member...">
+          <button id="add-member-btn" class="btn primary">Add</button>
+        </div>
+
+        <hr class="settings-divider">
+
+        <label class="settings-label">Dietary Restrictions</label>
+        <p class="settings-hint">Tag each person's allergies or dietary needs. Recipes with conflicting allergens will show warnings.</p>
+        <div id="household-restrictions-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes Modal (per-meal on This Week) -->
   <div id="feedback-modal" class="modal hidden">
     <div class="modal-content" style="max-width:480px;">
       <button class="modal-close feedback-modal-close">&times;</button>
@@ -406,6 +430,8 @@
         </div>
         <label>Categories (comma separated)</label>
         <input type="text" id="edit-recipe-categories">
+        <label>Contains</label>
+        <div id="edit-recipe-allergens" class="allergen-toggles"></div>
         <label>Source / URL</label>
         <input type="text" id="edit-recipe-source">
         <label>Notes</label>

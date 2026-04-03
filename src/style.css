@@ -437,9 +437,13 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   border-left: 4px solid transparent;
   cursor: pointer;
   transition: border-color 0.15s;
+  position: relative;
 }
 .recipe-card:hover {
   border-color: #C8BF9A;
+}
+.recipe-card.is-favorite {
+  border-left-color: var(--love);
 }
 .recipe-card-name {
   font-size: 1rem;
@@ -471,6 +475,22 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .card-action-btn.delete-btn:hover {
   background: #e53e3e;
   border-color: #e53e3e;
+}
+.card-trash-btn {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+  padding: 0.2rem;
+  line-height: 1;
+}
+.card-trash-btn:hover {
+  opacity: 0.8;
 }
 .card-action-btn.fav-action-btn.active {
   background: #fde8e8;
@@ -594,6 +614,162 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   color: var(--text-light);
 }
 .modal-close:hover { color: var(--text); }
+
+/* Household settings modal */
+.household-settings-body {
+  margin-top: 1rem;
+}
+.settings-label {
+  font-weight: 500;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.settings-hint {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-btn);
+  margin-bottom: 0.35rem;
+  background: var(--bg);
+}
+.member-name {
+  font-size: 0.95rem;
+}
+.member-remove-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+.member-remove-btn:hover {
+  color: var(--love);
+}
+.household-add-member {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.household-add-member input {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-btn);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+}
+
+.settings-divider {
+  border: none;
+  border-top: 0.8px solid var(--border);
+  margin: 1.25rem 0;
+}
+.restriction-block {
+  margin-bottom: 0.75rem;
+}
+.restriction-member-name {
+  display: block;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
+}
+.restriction-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.restriction-pill {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--r-pill);
+  border: 0.8px solid var(--border);
+  background: var(--bg);
+  color: var(--text-light);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.restriction-pill:hover {
+  border-color: #C8BF9A;
+  background: var(--bg-yellow-mid);
+}
+.restriction-pill.active {
+  background: #fde8e8;
+  color: var(--love);
+  border-color: var(--love);
+  font-weight: 500;
+}
+
+/* Allergen pills on recipe edit form */
+.allergen-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+.allergen-toggle {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--r-pill);
+  border: 0.8px solid var(--border);
+  background: var(--bg);
+  color: var(--text-light);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.allergen-toggle:hover {
+  border-color: #C8BF9A;
+  background: var(--bg-yellow-mid);
+}
+.allergen-toggle.active {
+  background: var(--accent);
+  color: var(--text);
+  border-color: #C8BF9A;
+  font-weight: 500;
+}
+
+/* Allergen chips on recipe cards */
+.allergen-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+.allergen-chip {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-pill);
+  background: var(--bg-yellow-mid);
+  color: var(--text-light);
+  border: 0.8px solid var(--border);
+}
+.allergen-chip.conflict {
+  background: #fde8e8;
+  color: var(--love);
+  border-color: var(--love);
+}
+
+/* Allergen warning in planner */
+.allergen-warning {
+  font-size: 0.78rem;
+  color: var(--love);
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.4rem;
+  background: #fde8e8;
+  border-radius: var(--r-btn);
+  display: inline-block;
+}
 
 /* Day picker (Add to Plan) */
 .add-to-plan-wrap {
@@ -1095,6 +1271,27 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   justify-content: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+/* Smart landing prompt (current week not yet planned) */
+.smart-landing {
+  background: var(--card);
+  border: 0.8px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--r-card);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+.smart-landing h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+.smart-landing p {
+  color: var(--text-light);
+  margin-bottom: 1.25rem;
 }
 
 /* Empty state cards (actionable, replaces plain text) */
@@ -2093,6 +2290,65 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   border-radius: 6px;
   border: 1px solid var(--border);
   font-size: 0.9rem;
+}
+
+/* === Rollover Panel === */
+.rollover-panel {
+  background: var(--card);
+  border-radius: var(--r-card);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 0.8px solid var(--border);
+  border-left: 3px solid var(--accent);
+}
+.rollover-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.rollover-hint {
+  color: var(--text-faint);
+  font-size: 0.82rem;
+}
+.rollover-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.rollover-btn {
+  background: var(--bg-yellow-mid);
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background 0.15s, border-color 0.15s;
+}
+.rollover-btn:hover {
+  background: var(--accent);
+  border-color: #C8BF9A;
+}
+.rollover-btn.added {
+  background: var(--primary-light);
+  border-color: var(--green-mid);
+  color: var(--primary);
+  cursor: default;
+}
+.rollover-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: var(--font-sans);
+}
+.rollover-dismiss:hover {
+  color: var(--text-light);
 }
 
 /* === Use-Up Panel === */

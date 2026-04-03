@@ -1,12 +1,13 @@
-import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow } from './firebase.js';
+import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions } from './firebase.js';
 import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, getRecipePrefs } from './preferences.js';
-import { renderPlanner, suggestAllMeals, shiftWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
+import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
 
 // === State ===
 const BETA_CODE = 'MEALS2026';
+const ALLERGENS = ['Dairy', 'Gluten', 'Tree Nuts', 'Peanuts', 'Eggs', 'Soy', 'Shellfish', 'Fish', 'Sesame', 'Vegetarian', 'Vegan'];
 let members = [];
 let appInitialized = false;
 
@@ -58,8 +59,9 @@ async function initApp(household) {
   await loadRecipes();
   await initPreferences();
 
-  // Get members from household
+  // Get members and restrictions from household
   members = await getHouseholdMembers();
+  await loadRestrictions();
   setupNavigation();
   setupPlannerPage();
   setupPlanViewPage();
@@ -69,6 +71,7 @@ async function initApp(household) {
 
   setupSignOut();
   setupEditModal();
+  setupHouseholdSettings();
 
   // Show household name + invite code in header
   if (household) {
@@ -282,6 +285,103 @@ function setupSignOut() {
   });
 }
 
+// === Household Settings ===
+function setupHouseholdSettings() {
+  const modal = document.getElementById('household-settings-modal');
+  const memberList = document.getElementById('household-member-list');
+  const restrictionsList = document.getElementById('household-restrictions-list');
+  const newInput = document.getElementById('new-member-input');
+
+  document.getElementById('household-settings-btn').addEventListener('click', () => {
+    renderMemberList();
+    renderRestrictions();
+    modal.classList.remove('hidden');
+  });
+
+  document.querySelector('.household-settings-close').addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+  modal.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+  });
+
+  function renderMemberList() {
+    memberList.innerHTML = '';
+    for (const m of members) {
+      const row = document.createElement('div');
+      row.className = 'member-row';
+      row.innerHTML = `
+        <span class="member-name">${escManage(m)}</span>
+        <button class="member-remove-btn" title="Remove ${escManage(m)}">&times;</button>
+      `;
+      row.querySelector('.member-remove-btn').addEventListener('click', async () => {
+        if (!confirm(`Remove "${m}" from your household? This won't delete their recipe preferences.`)) return;
+        members = members.filter(n => n !== m);
+        await updateHouseholdMembers(members);
+        renderMemberList();
+        renderRestrictions();
+        showToast(`"${m}" removed from household.`);
+      });
+      memberList.appendChild(row);
+    }
+  }
+
+  function renderRestrictions() {
+    const restrictions = getRestrictions();
+    restrictionsList.innerHTML = '';
+    for (const m of members) {
+      const memberRestrictions = restrictions[m] || [];
+      const block = document.createElement('div');
+      block.className = 'restriction-block';
+      block.innerHTML = `
+        <span class="restriction-member-name">${escManage(m)}</span>
+        <div class="restriction-pills">
+          ${ALLERGENS.map(a => {
+            const key = a.toLowerCase();
+            const active = memberRestrictions.includes(key) ? ' active' : '';
+            return `<button class="restriction-pill${active}" data-allergen="${escAttr(key)}">${escManage(a)}-free</button>`;
+          }).join('')}
+        </div>
+      `;
+      block.querySelectorAll('.restriction-pill').forEach(pill => {
+        pill.addEventListener('click', async () => {
+          const allergen = pill.dataset.allergen;
+          const current = restrictions[m] || [];
+          if (current.includes(allergen)) {
+            restrictions[m] = current.filter(a => a !== allergen);
+          } else {
+            restrictions[m] = [...current, allergen];
+          }
+          if (restrictions[m].length === 0) delete restrictions[m];
+          await saveRestrictions(restrictions);
+          pill.classList.toggle('active');
+        });
+      });
+      restrictionsList.appendChild(block);
+    }
+  }
+
+  document.getElementById('add-member-btn').addEventListener('click', addMember);
+  newInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addMember();
+  });
+
+  async function addMember() {
+    const name = newInput.value.trim();
+    if (!name) return;
+    if (members.some(m => m.toLowerCase() === name.toLowerCase())) {
+      showToast(`"${name}" is already in your household.`);
+      return;
+    }
+    members.push(name);
+    await updateHouseholdMembers(members);
+    newInput.value = '';
+    renderMemberList();
+    renderRestrictions();
+    showToast(`"${name}" added to household.`);
+  }
+}
+
 // === Navigation ===
 function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -313,6 +413,10 @@ function showPage(pageId) {
     b.classList.toggle('active', b.dataset.page === pageId);
   });
 
+  // Sync planner week to match the week being viewed on This Week
+  if (pageId === 'planner') {
+    setWeek(getViewWeekStart());
+  }
   // Refresh page content on show
   if (pageId === 'planner') refreshPlanner();
   if (pageId === 'plan-view') refreshPlanView();
@@ -366,7 +470,16 @@ function setupPlannerPage() {
     }
     await commitPlan(weekKey, plan);
     updateCommitStatus(weekKey);
-    showToast('Plan committed! It\'s now visible on "This Week\'s Plan".');
+    showToast('Plan committed!');
+    // Navigate to This Week, synced to the committed week
+    const committedStart = new Date(weekKey + 'T00:00:00');
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const currentMonday = new Date(now.getFullYear(), now.getMonth(), diff);
+    currentMonday.setHours(0, 0, 0, 0);
+    viewWeekOffset = Math.round((committedStart - currentMonday) / (7 * 24 * 60 * 60 * 1000));
+    showPage('plan-view');
   });
 }
 
@@ -1931,6 +2044,14 @@ function refreshManageRecipeList() {
   const recipes = filterRecipes(query);
   const prefs = getAllPreferences();
 
+  // Sort favorites to the top, preserving alphabetical order within each group
+  recipes.sort((a, b) => {
+    const aFav = prefs[a.uid]?.favorite ? 1 : 0;
+    const bFav = prefs[b.uid]?.favorite ? 1 : 0;
+    if (aFav !== bFav) return bFav - aFav;
+    return a.name.localeCompare(b.name);
+  });
+
   document.getElementById('manage-recipe-count').textContent = `(${getRecipes().length})`;
 
   renderRecipeList(container, recipes, (recipe) => {
@@ -1939,6 +2060,7 @@ function refreshManageRecipeList() {
     document.getElementById('recipe-modal').classList.remove('hidden');
   }, prefs, {
     members,
+    restrictions: getRestrictions(),
     onEdit: (recipe) => openEditModal(recipe),
     onDelete: async (recipe) => {
       if (!await confirmDelete(recipe.name)) return;
@@ -1996,6 +2118,10 @@ function setupEditModal() {
       return;
     }
 
+    // Collect active allergen toggles
+    const allergens = [...document.querySelectorAll('#edit-recipe-allergens .allergen-toggle.active')]
+      .map(btn => btn.dataset.allergen);
+
     const updated = {
       ...currentEditRecipe,
       name,
@@ -2008,6 +2134,7 @@ function setupEditModal() {
         .split(',').map(s => s.trim()).filter(Boolean),
       source: document.getElementById('edit-recipe-source').value,
       notes: document.getElementById('edit-recipe-notes').value,
+      allergens,
     };
 
     await saveRecipeToFirebase(updated);
@@ -2158,6 +2285,22 @@ function openEditModal(recipe) {
   document.getElementById('edit-recipe-categories').value = (recipe.categories || []).join(', ');
   document.getElementById('edit-recipe-source').value = recipe.source || '';
   document.getElementById('edit-recipe-notes').value = recipe.notes || '';
+
+  // Allergen toggles
+  const allergensContainer = document.getElementById('edit-recipe-allergens');
+  const recipeAllergens = recipe.allergens || [];
+  allergensContainer.innerHTML = ALLERGENS.map(a => {
+    const key = a.toLowerCase();
+    const active = recipeAllergens.includes(key) ? ' active' : '';
+    return `<button type="button" class="allergen-toggle${active}" data-allergen="${escAttr(key)}">${escManage(a)}</button>`;
+  }).join('');
+  allergensContainer.querySelectorAll('.allergen-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      btn.classList.toggle('active');
+    });
+  });
+
   document.getElementById('edit-recipe-modal').classList.remove('hidden');
 }
 
