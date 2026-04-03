@@ -284,7 +284,9 @@ export async function renderPlanner(container, members) {
         for (const allergen of recipe.allergens) {
           if (memberRestrictions.includes(allergen)) {
             const label = allergen.charAt(0).toUpperCase() + allergen.slice(1);
-            warnings.push(`Contains ${label} \u2014 ${member} is ${label}-free`);
+            const isLifestyle = (allergen === 'vegetarian' || allergen === 'vegan');
+            const desc = isLifestyle ? label : `${label}-free`;
+            warnings.push(`Contains ${label} \u2014 ${member} is ${desc}`);
           }
         }
       }

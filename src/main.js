@@ -339,7 +339,9 @@ function setupHouseholdSettings() {
           ${ALLERGENS.map(a => {
             const key = a.toLowerCase();
             const active = memberRestrictions.includes(key) ? ' active' : '';
-            return `<button class="restriction-pill${active}" data-allergen="${escAttr(key)}">${escManage(a)}-free</button>`;
+            const isLifestyle = (a === 'Vegetarian' || a === 'Vegan');
+            const label = isLifestyle ? a : `${a}-free`;
+            return `<button class="restriction-pill${active}" data-allergen="${escAttr(key)}">${escManage(label)}</button>`;
           }).join('')}
         </div>
       `;
