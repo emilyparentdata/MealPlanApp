@@ -1224,7 +1224,8 @@ function setupPasteImport() {
     pendingPasteRecipe = null;
     textInput.value = '';
     preview.classList.add('hidden');
-    showToast('Recipe loaded into the form — edit and save when ready.');
+    showToast('Recipe moved to the "Manual" tab above — edit and hit Save.');
+    document.getElementById('tab-manual').scrollIntoView({ behavior: 'smooth' });
   });
 
   document.getElementById('paste-cancel-btn').addEventListener('click', () => {
@@ -1691,8 +1692,13 @@ function setupScanImport() {
     document.getElementById('new-recipe-directions').value = pendingScanRecipe.directions || '';
     document.getElementById('new-recipe-notes').value = pendingScanRecipe.notes || '';
     resetScan();
-    showToast('Recipe loaded into form — review and save.');
-    document.getElementById('add-recipe-form').scrollIntoView({ behavior: 'smooth' });
+    // Switch to manual tab
+    document.querySelectorAll('.add-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.add-tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-tab="tab-manual"]').classList.add('active');
+    document.getElementById('tab-manual').classList.add('active');
+    showToast('Recipe moved to the "Manual" tab — edit and hit Save.');
+    document.getElementById('tab-manual').scrollIntoView({ behavior: 'smooth' });
   });
 
   // Cancel (single)
