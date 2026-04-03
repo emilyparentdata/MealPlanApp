@@ -1835,6 +1835,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 #scan-status.hidden { display: none; }
 #scan-error.hidden { display: none; }
 #scan-bulk.hidden { display: none; }
+#paste-status.hidden { display: none; }
+#paste-preview.hidden { display: none; }
+#paste-error.hidden { display: none; }
 
 .scan-bulk-progress {
   display: flex;
