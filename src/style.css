@@ -2038,7 +2038,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 .add-recipe-tabs {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
   gap: 0.4rem;
   margin-bottom: 1rem;
 }
@@ -2057,7 +2057,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   font-weight: 600;
   color: var(--text-light);
   cursor: pointer;
-  white-space: nowrap;
   transition: color 0.15s, border-color 0.15s;
 }
 
