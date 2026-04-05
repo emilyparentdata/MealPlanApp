@@ -1838,6 +1838,8 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 #paste-status.hidden { display: none; }
 #paste-preview.hidden { display: none; }
 #paste-error.hidden { display: none; }
+#shared-preview.hidden { display: none; }
+#shared-import-error.hidden { display: none; }
 
 .scan-bulk-progress {
   display: flex;

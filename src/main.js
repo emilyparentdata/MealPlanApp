@@ -1318,8 +1318,14 @@ function setupSharedPacks() {
       const { loadSharedPack } = await import('./firebase.js');
       loadedPack = await loadSharedPack(code);
 
-      // Pre-select all recipes
-      selectedImportUids = new Set(loadedPack.recipes.map((_, i) => i));
+      // Pre-select recipes that aren't already in the collection
+      const existingNames = new Set(getRecipes().map(r => r.name.trim().toLowerCase()));
+      selectedImportUids = new Set();
+      loadedPack.recipes.forEach((r, i) => {
+        if (!existingNames.has(r.name.trim().toLowerCase())) {
+          selectedImportUids.add(i);
+        }
+      });
       renderImportPreview();
       previewEl.classList.remove('hidden');
     } catch (err) {
