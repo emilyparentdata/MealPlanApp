@@ -2037,19 +2037,21 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 }
 
 .add-recipe-tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.4rem;
   margin-bottom: 1rem;
-  overflow-x: auto;
 }
 
 .add-tab {
-  padding: 0.5rem 1rem;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.6rem 0.4rem;
+  background: var(--bg);
+  border: 0.8px solid var(--border);
+  border-radius: var(--r-btn);
   font-family: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -2060,12 +2062,26 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 }
 
 .add-tab:hover {
+  background: var(--bg-yellow-mid);
+  border-color: #C8BF9A;
   color: var(--text);
 }
 
 .add-tab.active {
   color: var(--primary);
-  border-bottom-color: var(--primary);
+  background: var(--primary-light);
+  border-color: var(--green-mid);
+}
+
+.add-tab-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.add-tab-label {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .add-tab-content {
