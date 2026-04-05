@@ -1251,6 +1251,53 @@ function setupSharedPacks() {
 
   let loadedPack = null;
   let selectedUids = new Set();
+  let selectedImportUids = new Set();
+
+  function renderImportPreview() {
+    if (!loadedPack) return;
+    const existingNames = new Set(getRecipes().map(r => r.name.trim().toLowerCase()));
+    const count = selectedImportUids.size;
+    previewContent.innerHTML = `
+      <h4>${escManage(loadedPack.name)}</h4>
+      <p>${loadedPack.recipes.length} recipe${loadedPack.recipes.length === 1 ? '' : 's'} in this pack.
+        Select the ones you want to import.</p>
+      <div class="shared-select-actions">
+        <button class="btn shared-select-all">Select All</button>
+        <button class="btn shared-select-none">Select None</button>
+        <span class="shared-select-count">${count} selected</span>
+      </div>
+      <ul class="shared-recipe-list">
+        ${loadedPack.recipes.map((r, i) => {
+          const checked = selectedImportUids.has(i) ? 'checked' : '';
+          const isDupe = existingNames.has(r.name.trim().toLowerCase());
+          return `<li>
+            <label class="shared-recipe-check">
+              <input type="checkbox" data-idx="${i}" ${checked}>
+              <span>${escManage(r.name)}</span>
+              ${isDupe ? '<span class="shared-dupe-tag">already have</span>' : ''}
+            </label>
+          </li>`;
+        }).join('')}
+      </ul>
+    `;
+
+    previewContent.querySelector('.shared-select-all').addEventListener('click', () => {
+      selectedImportUids = new Set(loadedPack.recipes.map((_, i) => i));
+      renderImportPreview();
+    });
+    previewContent.querySelector('.shared-select-none').addEventListener('click', () => {
+      selectedImportUids = new Set();
+      renderImportPreview();
+    });
+    previewContent.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const idx = parseInt(cb.dataset.idx);
+        if (cb.checked) selectedImportUids.add(idx);
+        else selectedImportUids.delete(idx);
+        previewContent.querySelector('.shared-select-count').textContent = selectedImportUids.size + ' selected';
+      });
+    });
+  }
 
   // --- Import side ---
 
@@ -1271,13 +1318,9 @@ function setupSharedPacks() {
       const { loadSharedPack } = await import('./firebase.js');
       loadedPack = await loadSharedPack(code);
 
-      previewContent.innerHTML = `
-        <h4>${escManage(loadedPack.name)}</h4>
-        <p>${loadedPack.recipes.length} recipe${loadedPack.recipes.length === 1 ? '' : 's'}</p>
-        <ul class="shared-recipe-list">
-          ${loadedPack.recipes.map(r => `<li>${escManage(r.name)}</li>`).join('')}
-        </ul>
-      `;
+      // Pre-select all recipes
+      selectedImportUids = new Set(loadedPack.recipes.map((_, i) => i));
+      renderImportPreview();
       previewEl.classList.remove('hidden');
     } catch (err) {
       errorEl.textContent = err.message || 'Failed to load pack.';
@@ -1290,43 +1333,16 @@ function setupSharedPacks() {
 
   document.getElementById('shared-import-btn').addEventListener('click', async () => {
     if (!loadedPack) return;
-
-    // Check for duplicates by name
-    const existingNames = new Set(getRecipes().map(r => r.name.trim().toLowerCase()));
-    const dupes = loadedPack.recipes.filter(r => existingNames.has(r.name.trim().toLowerCase()));
-    const newOnly = loadedPack.recipes.filter(r => !existingNames.has(r.name.trim().toLowerCase()));
-
-    if (dupes.length > 0) {
-      const choice = await showSharedImportModal(
-        'Some recipes already exist',
-        `${dupes.length} of ${loadedPack.recipes.length} recipe${loadedPack.recipes.length === 1 ? '' : 's'} ${dupes.length === 1 ? 'is' : 'are'} already in your collection: ${dupes.map(r => `"${r.name}"`).join(', ')}.`,
-        newOnly.length > 0
-          ? [
-              { label: 'Import New Only', value: 'new', primary: true },
-              { label: 'Import All Anyway', value: 'all' },
-              { label: 'Cancel', value: 'cancel' },
-            ]
-          : [
-              { label: 'Import All Anyway', value: 'all' },
-              { label: 'Cancel', value: 'cancel' },
-            ]
-      );
-
-      if (choice === 'cancel') return;
-      const toImport = choice === 'new' ? newOnly : loadedPack.recipes;
-      if (toImport.length === 0) {
-        await showSharedImportModal('All set!', 'You already have all the recipes from this pack.', [{ label: 'OK', value: 'ok', primary: true }]);
-        loadedPack = null;
-        codeInput.value = '';
-        previewEl.classList.add('hidden');
-        return;
-      }
-      await doSharedImport(toImport, loadedPack.name);
-    } else {
-      await doSharedImport(loadedPack.recipes, loadedPack.name);
+    if (selectedImportUids.size === 0) {
+      showToast('Select at least one recipe to import.');
+      return;
     }
 
+    const selected = loadedPack.recipes.filter((_, i) => selectedImportUids.has(i));
+    await doSharedImport(selected, loadedPack.name);
+
     loadedPack = null;
+    selectedImportUids = new Set();
     codeInput.value = '';
     previewEl.classList.add('hidden');
   });
