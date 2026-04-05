@@ -2699,6 +2699,21 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     justify-content: center;
   }
 
+  /* -- Add recipe tabs: compact grid on mobile -- */
+  .add-recipe-tabs {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+  }
+  .add-tab {
+    padding: 0.45rem 0.25rem;
+  }
+  .add-tab-icon {
+    font-size: 1rem;
+  }
+  .add-tab-label {
+    font-size: 0.65rem;
+  }
+
   /* -- Planner day cards: stack who-home below day name -- */
   .planner-day-header {
     flex-direction: column;
