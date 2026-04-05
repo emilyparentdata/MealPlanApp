@@ -1270,12 +1270,22 @@ function setupSharedPacks() {
         ${loadedPack.recipes.map((r, i) => {
           const checked = selectedImportUids.has(i) ? 'checked' : '';
           const isDupe = existingNames.has(r.name.trim().toLowerCase());
+          const meta = [r.prep_time ? `Prep: ${r.prep_time}` : '', r.cook_time ? `Cook: ${r.cook_time}` : '', r.servings ? `Serves: ${r.servings}` : ''].filter(Boolean).join(' · ');
           return `<li>
-            <label class="shared-recipe-check">
-              <input type="checkbox" data-idx="${i}" ${checked}>
-              <span>${escManage(r.name)}</span>
-              ${isDupe ? '<span class="shared-dupe-tag">already have</span>' : ''}
-            </label>
+            <div class="shared-recipe-row">
+              <label class="shared-recipe-check">
+                <input type="checkbox" data-idx="${i}" ${checked}>
+                <span>${escManage(r.name)}</span>
+                ${isDupe ? '<span class="shared-dupe-tag">already have</span>' : ''}
+              </label>
+              <button class="shared-preview-toggle btn" data-idx="${i}">Preview</button>
+            </div>
+            <div class="shared-recipe-detail hidden" data-detail="${i}">
+              ${meta ? `<div class="shared-detail-meta">${escManage(meta)}</div>` : ''}
+              ${r.ingredients ? `<div class="shared-detail-section"><strong>Ingredients</strong><pre>${escManage(r.ingredients)}</pre></div>` : ''}
+              ${r.directions ? `<div class="shared-detail-section"><strong>Directions</strong><pre>${escManage(r.directions)}</pre></div>` : ''}
+              ${r.notes ? `<div class="shared-detail-section"><strong>Notes</strong><pre>${escManage(r.notes)}</pre></div>` : ''}
+            </div>
           </li>`;
         }).join('')}
       </ul>
@@ -1295,6 +1305,14 @@ function setupSharedPacks() {
         if (cb.checked) selectedImportUids.add(idx);
         else selectedImportUids.delete(idx);
         previewContent.querySelector('.shared-select-count').textContent = selectedImportUids.size + ' selected';
+      });
+    });
+    previewContent.querySelectorAll('.shared-preview-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const detail = previewContent.querySelector(`.shared-recipe-detail[data-detail="${btn.dataset.idx}"]`);
+        const isHidden = detail.classList.contains('hidden');
+        detail.classList.toggle('hidden');
+        btn.textContent = isHidden ? 'Hide' : 'Preview';
       });
     });
   }
