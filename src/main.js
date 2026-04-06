@@ -601,6 +601,36 @@ function setupGroceryPage() {
     refreshGrocery();
   });
 
+  async function copyTextToClipboard(text) {
+    // Try the modern async API first
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // fall through to legacy fallback
+      }
+    }
+    // Legacy fallback: hidden textarea + execCommand('copy')
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '0';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
   document.getElementById('copy-grocery-btn').addEventListener('click', async () => {
     if (groceryLoading) await groceryLoading;
     const text = getGroceryText();
@@ -608,12 +638,8 @@ function setupGroceryPage() {
       showToast('Nothing to copy — no meals planned this week.');
       return;
     }
-    try {
-      await navigator.clipboard.writeText(text);
-      showToast('Grocery list copied to clipboard!');
-    } catch {
-      showToast('Could not copy — try selecting and copying manually.');
-    }
+    const ok = await copyTextToClipboard(text);
+    showToast(ok ? 'Grocery list copied to clipboard!' : 'Could not copy — try selecting and copying manually.');
   });
 
   document.getElementById('share-grocery-btn').addEventListener('click', async () => {
@@ -626,20 +652,15 @@ function setupGroceryPage() {
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Grocery List', text });
+        return;
       } catch (e) {
-        if (e.name !== 'AbortError') {
-          showToast('Could not share.');
-        }
-      }
-    } else {
-      // Fallback to clipboard on desktop
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast('Grocery list copied to clipboard!');
-      } catch {
-        showToast('Could not share — try the Copy button.');
+        if (e.name === 'AbortError') return;
+        // fall through to clipboard fallback
       }
     }
+    // Desktop / no Web Share API: copy to clipboard
+    const ok = await copyTextToClipboard(text);
+    showToast(ok ? 'Grocery list copied to clipboard!' : 'Could not share — try the Copy button.');
   });
 
   // Extra items
