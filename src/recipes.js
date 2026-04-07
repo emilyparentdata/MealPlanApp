@@ -1,4 +1,5 @@
 import { getArchivedRecipes, getCustomRecipes } from './firebase.js';
+import { isSlowCooker, isInstantPot, getRecipeTotalMinutes } from './convenience.js';
 
 let allRecipes = [];
 
@@ -29,7 +30,7 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
     container.innerHTML = '<p style="color:var(--text-light);padding:2rem;">No recipes found.</p>';
     return;
   }
-  const { onEdit, onDelete, onToggleFavorite, onAddToPlan, onToggleDoesntEat, onToggleMakeAhead, members, restrictions } = callbacks;
+  const { onEdit, onDelete, onToggleFavorite, onAddToPlan, onToggleDoesntEat, onToggleMakeAhead, onToggleSlowCooker, onToggleInstantPot, members, restrictions } = callbacks;
 
   for (const r of recipes) {
     const card = document.createElement('div');
@@ -40,6 +41,20 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
     const isFav = pref.favorite;
     const isMakeAhead = pref.makeAhead;
     const doesntEat = pref.doesntEat || [];
+
+    // Method tags (auto-detected, can be overridden)
+    const slowCookerOn = isSlowCooker(r, pref);
+    const instantPotOn = isInstantPot(r, pref);
+    const slowCookerOverridden = pref.slowCooker === true || pref.slowCooker === false;
+    const instantPotOverridden = pref.instantPot === true || pref.instantPot === false;
+
+    // Time chip (read-only)
+    const totalMinutes = getRecipeTotalMinutes(r);
+    let timeChipHtml = '';
+    if (totalMinutes !== null && totalMinutes <= 30) {
+      const label = totalMinutes <= 20 ? 'Quick \u226420 min' : 'Quick \u226430 min';
+      timeChipHtml = `<span class="time-chip" title="Derived from prep + cook time">${label}</span>`;
+    }
 
     // Action buttons row
     const actions = [];
@@ -78,9 +93,11 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
         </div>
       </details>
       <details class="card-detail tags-detail">
-        <summary>Tags</summary>
+        <summary>Tags${timeChipHtml ? ' ' + timeChipHtml : ''}</summary>
         <div class="card-detail-body">
           <button class="pref-flag-btn make-ahead-btn${isMakeAhead ? ' active' : ''}">Make Ahead</button>
+          <button class="pref-flag-btn slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
+          <button class="pref-flag-btn instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
         </div>
       </details>
       ${onDelete ? '<button class="card-trash-btn" title="Delete recipe">&#128465;</button>' : ''}
@@ -128,6 +145,32 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       if (onToggleMakeAhead) {
         await onToggleMakeAhead(r.uid);
         e.target.classList.toggle('active');
+      }
+    });
+
+    // Slow Cooker (auto-detected, can be overridden)
+    card.querySelector('.slow-cooker-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (onToggleSlowCooker) {
+        const newState = await onToggleSlowCooker(r.uid, r);
+        e.target.classList.toggle('active', newState);
+        const updatedPref = preferences[r.uid] || {};
+        const overridden = updatedPref.slowCooker === true || updatedPref.slowCooker === false;
+        e.target.title = overridden ? 'Manual override' : 'Auto-detected';
+        e.target.textContent = `Slow Cooker${overridden ? '' : ' \u2728'}`;
+      }
+    });
+
+    // Instant Pot (auto-detected, can be overridden)
+    card.querySelector('.instant-pot-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (onToggleInstantPot) {
+        const newState = await onToggleInstantPot(r.uid, r);
+        e.target.classList.toggle('active', newState);
+        const updatedPref = preferences[r.uid] || {};
+        const overridden = updatedPref.instantPot === true || updatedPref.instantPot === false;
+        e.target.title = overridden ? 'Manual override' : 'Auto-detected';
+        e.target.textContent = `Instant Pot${overridden ? '' : ' \u2728'}`;
       }
     });
 

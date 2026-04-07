@@ -1,10 +1,10 @@
 import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions } from './firebase.js';
-import { loadRecipes, getRecipes, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
-import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, getRecipePrefs } from './preferences.js';
+import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
+import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs } from './preferences.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
-import { getConvenienceLabel } from './convenience.js';
+import { getConvenienceLabel, getRecipeTotalMinutes, isSlowCooker, isInstantPot } from './convenience.js';
 
 // === State ===
 const BETA_CODE = 'MEALS2026';
@@ -713,6 +713,7 @@ function refreshGrocery() {
 
 function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete } = {}) {
   const prefs = getRecipePrefs(recipeUid);
+  const recipe = getRecipeByUid(recipeUid);
   const el = document.createElement('div');
   el.className = 'inline-pref-controls';
 
@@ -730,12 +731,31 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
   }).join('');
   const makeAheadActive = prefs.makeAhead ? ' active' : '';
 
+  // Method tags (auto-detected, can be overridden)
+  const slowCookerOn = recipe ? isSlowCooker(recipe, prefs) : false;
+  const instantPotOn = recipe ? isInstantPot(recipe, prefs) : false;
+  const slowCookerOverridden = prefs.slowCooker === true || prefs.slowCooker === false;
+  const instantPotOverridden = prefs.instantPot === true || prefs.instantPot === false;
+
+  // Time chip (read-only, derived from prep+cook)
+  const totalMinutes = recipe ? getRecipeTotalMinutes(recipe) : null;
+  let timeChipHtml = '';
+  if (totalMinutes !== null && totalMinutes <= 30) {
+    const label = totalMinutes <= 20 ? 'Quick \u226420 min' : 'Quick \u226430 min';
+    timeChipHtml = `<span class="time-chip" title="Derived from prep + cook time">${label}</span>`;
+  }
+
   el.innerHTML = `
     <div class="pref-row-inline pref-top-actions">${topButtons}</div>
     <div class="pref-row-inline">
       <span class="pref-label">Won't eat:</span>
       <div class="pref-member-btns">${doesntEatHtml}</div>
+    </div>
+    <div class="pref-row-inline pref-method-row">
       <button class="pref-flag-btn make-ahead-btn${makeAheadActive}">Make Ahead</button>
+      <button class="pref-flag-btn slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
+      <button class="pref-flag-btn instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
+      ${timeChipHtml}
     </div>
   `;
 
@@ -773,6 +793,31 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
     e.target.classList.toggle('active');
     if (onUpdate) onUpdate();
   });
+
+  // Wire slow cooker / instant pot (auto-detected with manual override)
+  if (recipe) {
+    el.querySelector('.slow-cooker-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const newState = await toggleSlowCooker(recipeUid, recipe);
+      e.target.classList.toggle('active', newState);
+      const updated = getRecipePrefs(recipeUid);
+      const overridden = updated.slowCooker === true || updated.slowCooker === false;
+      e.target.title = overridden ? 'Manual override' : 'Auto-detected';
+      e.target.textContent = `Slow Cooker${overridden ? '' : ' \u2728'}`;
+      if (onUpdate) onUpdate();
+    });
+
+    el.querySelector('.instant-pot-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const newState = await toggleInstantPot(recipeUid, recipe);
+      e.target.classList.toggle('active', newState);
+      const updated = getRecipePrefs(recipeUid);
+      const overridden = updated.instantPot === true || updated.instantPot === false;
+      e.target.title = overridden ? 'Manual override' : 'Auto-detected';
+      e.target.textContent = `Instant Pot${overridden ? '' : ' \u2728'}`;
+      if (onUpdate) onUpdate();
+    });
+  }
 
   return el;
 }
@@ -2243,6 +2288,12 @@ function refreshManageRecipeList() {
     },
     onToggleMakeAhead: async (recipeUid) => {
       await toggleMakeAhead(recipeUid);
+    },
+    onToggleSlowCooker: async (recipeUid, recipe) => {
+      return await toggleSlowCooker(recipeUid, recipe);
+    },
+    onToggleInstantPot: async (recipeUid, recipe) => {
+      return await toggleInstantPot(recipeUid, recipe);
     },
   });
 }
