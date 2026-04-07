@@ -91,7 +91,7 @@ async function getRecentRecipeUids(weeksBack) {
 
 // === Render planner — two-step: constraints first, then suggest ===
 
-export async function renderPlanner(container, members) {
+export async function renderPlanner(container, members, { onViewRecipe } = {}) {
   const weekKey = getWeekKey();
   const plan = await loadPlan(weekKey) || { days: {} };
   const recipes = getRecipes();
@@ -128,7 +128,7 @@ export async function renderPlanner(container, members) {
     const merged = [...current, ...newItems.filter(n => !current.some(c => c.toLowerCase() === n.toLowerCase()))];
     await saveUseUpItems(weekKey, merged);
     input.value = '';
-    renderPlanner(container, members);
+    renderPlanner(container, members, { onViewRecipe });
   };
 
   useUpEl.querySelector('.use-up-add-btn').addEventListener('click', addUseUpItem);
@@ -141,7 +141,7 @@ export async function renderPlanner(container, members) {
       const item = btn.dataset.item;
       const current = await loadUseUpItems(weekKey);
       await saveUseUpItems(weekKey, current.filter(i => i !== item));
-      renderPlanner(container, members);
+      renderPlanner(container, members, { onViewRecipe });
     });
   });
 
@@ -190,6 +190,7 @@ export async function renderPlanner(container, members) {
           <input type="text" class="meal-search" placeholder="Search recipes..." value="${escAttr(selectedRecipe ? selectedRecipe.name : '')}" autocomplete="off">
           <div class="meal-dropdown hidden"></div>
         </div>
+        <button class="view-btn ${selectedRecipe ? '' : 'hidden'}" title="View recipe details">View</button>
         <button class="suggest-btn">Re-suggest</button>
         <button class="clear-btn">Clear</button>
       </div>
@@ -244,11 +245,19 @@ export async function renderPlanner(container, members) {
     }
     updateAllergenWarnings();
 
+    // Show/hide the View button based on whether a recipe is selected
+    const updateViewBtnVisibility = () => {
+      const viewBtn = dayEl.querySelector('.view-btn');
+      const uid = dayEl.querySelector('.meal-combo')?.dataset.recipeUid;
+      if (viewBtn) viewBtn.classList.toggle('hidden', !uid);
+    };
+
     // Auto-save on any change
     const saveDay = () => {
       saveDayData(weekKey, dayName, dayEl, members, plan);
       refreshDropdownMarkers(container, plan, recipes);
       updateAllergenWarnings();
+      updateViewBtnVisibility();
     };
 
     dayEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', saveDay));
@@ -276,6 +285,7 @@ export async function renderPlanner(container, members) {
         await savePlan(weekKey, plan);
         refreshDropdownMarkers(container, plan, recipes);
         updateAllergenWarnings();
+        updateViewBtnVisibility();
       } else if (result && result.reason === 'no-convenience-matches') {
         // Surface the convenience filter explanation inline on the day
         const errEl = dayEl.querySelector('.suggest-error') || (() => {
@@ -293,6 +303,14 @@ export async function renderPlanner(container, members) {
     dayEl.querySelector('.clear-btn').addEventListener('click', () => {
       setComboValue(dayEl, '', '');
       saveDay();
+    });
+
+    // View recipe details (opens the recipe modal via callback)
+    dayEl.querySelector('.view-btn').addEventListener('click', () => {
+      const uid = dayEl.querySelector('.meal-combo')?.dataset.recipeUid;
+      if (!uid || !onViewRecipe) return;
+      const recipe = recipes.find(r => r.uid === uid);
+      if (recipe) onViewRecipe(recipe);
     });
 
     container.appendChild(dayEl);

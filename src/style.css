@@ -1168,6 +1168,18 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   transition: background 0.15s;
 }
 .planner-day-meal .clear-btn:hover { background: var(--bg-yellow-mid); }
+.planner-day-meal .view-btn {
+  background: transparent;
+  color: var(--primary, #4a6b3a);
+  border: 0.8px solid var(--primary, #4a6b3a);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.15s;
+}
+.planner-day-meal .view-btn:hover { background: var(--primary-light, #e8f0e3); }
+.planner-day-meal .view-btn.hidden { display: none; }
 
 .planner-day-sides {
   margin-top: 0.5rem;

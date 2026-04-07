@@ -527,7 +527,13 @@ function refreshPlanner() {
     `;
     return;
   }
-  renderPlanner(grid, members);
+  renderPlanner(grid, members, {
+    onViewRecipe: (recipe) => {
+      currentDetailRecipe = recipe;
+      renderRecipeDetail(document.getElementById('recipe-detail'), recipe);
+      document.getElementById('recipe-modal').classList.remove('hidden');
+    },
+  });
   updateCommitStatus(weekKey);
 }
 
