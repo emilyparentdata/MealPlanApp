@@ -745,19 +745,40 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
     timeChipHtml = `<span class="time-chip" title="Derived from prep + cook time">${label}</span>`;
   }
 
+  // Chip strip showing currently active convenience tags (read-only display)
+  function buildChipStrip() {
+    const p = getRecipePrefs(recipeUid);
+    const sc = recipe ? isSlowCooker(recipe, p) : false;
+    const ip = recipe ? isInstantPot(recipe, p) : false;
+    const scOver = p.slowCooker === true || p.slowCooker === false;
+    const ipOver = p.instantPot === true || p.instantPot === false;
+    const chips = [];
+    if (timeChipHtml) chips.push(timeChipHtml);
+    if (sc) chips.push(`<span class="time-chip" title="${scOver ? 'Manual override' : 'Auto-detected'}">Slow Cooker${scOver ? '' : ' \u2728'}</span>`);
+    if (ip) chips.push(`<span class="time-chip" title="${ipOver ? 'Manual override' : 'Auto-detected'}">Instant Pot${ipOver ? '' : ' \u2728'}</span>`);
+    if (p.makeAhead) chips.push(`<span class="time-chip">Make Ahead</span>`);
+    return chips.join('');
+  }
+
   el.innerHTML = `
     <div class="pref-row-inline pref-top-actions">${topButtons}</div>
     <div class="pref-row-inline">
       <span class="pref-label">Won't eat:</span>
       <div class="pref-member-btns">${doesntEatHtml}</div>
     </div>
+    <div class="convenience-chip-strip allergen-chips">${buildChipStrip()}</div>
     <div class="pref-row-inline pref-method-row">
-      <button class="pref-flag-btn make-ahead-btn${makeAheadActive}">Make Ahead</button>
-      <button class="pref-flag-btn slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
-      <button class="pref-flag-btn instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
-      ${timeChipHtml}
+      <span class="pref-label">Edit tags:</span>
+      <button class="pref-flag-btn toggle-pill make-ahead-btn${makeAheadActive}">Make Ahead</button>
+      <button class="pref-flag-btn toggle-pill slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
+      <button class="pref-flag-btn toggle-pill instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
     </div>
   `;
+
+  function refreshChipStrip() {
+    const strip = el.querySelector('.convenience-chip-strip');
+    if (strip) strip.innerHTML = buildChipStrip();
+  }
 
   // Wire favorite
   el.querySelector('.fav-flag-btn').addEventListener('click', async (e) => {
@@ -791,6 +812,7 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
     e.stopPropagation();
     await toggleMakeAhead(recipeUid);
     e.target.classList.toggle('active');
+    refreshChipStrip();
     if (onUpdate) onUpdate();
   });
 
@@ -804,6 +826,7 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
       const overridden = updated.slowCooker === true || updated.slowCooker === false;
       e.target.title = overridden ? 'Manual override' : 'Auto-detected';
       e.target.textContent = `Slow Cooker${overridden ? '' : ' \u2728'}`;
+      refreshChipStrip();
       if (onUpdate) onUpdate();
     });
 
@@ -815,6 +838,7 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
       const overridden = updated.instantPot === true || updated.instantPot === false;
       e.target.title = overridden ? 'Manual override' : 'Auto-detected';
       e.target.textContent = `Instant Pot${overridden ? '' : ' \u2728'}`;
+      refreshChipStrip();
       if (onUpdate) onUpdate();
     });
   }

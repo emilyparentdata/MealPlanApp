@@ -79,7 +79,15 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       const label = d.charAt(0).toUpperCase() + d.slice(1);
       return `<span class="allergen-chip diet">${esc(label)}</span>`;
     }).join('');
-    const allChips = allergenChips + dietChips;
+
+    // Convenience chips (only shown when active/detected) — green styling
+    const convenienceChips = [];
+    if (timeChipHtml) convenienceChips.push(timeChipHtml);
+    if (slowCookerOn) convenienceChips.push(`<span class="time-chip" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</span>`);
+    if (instantPotOn) convenienceChips.push(`<span class="time-chip" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</span>`);
+    if (isMakeAhead) convenienceChips.push(`<span class="time-chip">Make Ahead</span>`);
+
+    const allChips = allergenChips + dietChips + convenienceChips.join('');
 
     card.innerHTML = `
       <h3 class="recipe-card-name">${esc(r.name)}</h3>
@@ -93,11 +101,12 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
         </div>
       </details>
       <details class="card-detail tags-detail">
-        <summary>Tags${timeChipHtml ? ' ' + timeChipHtml : ''}</summary>
+        <summary>Edit Tags</summary>
         <div class="card-detail-body">
-          <button class="pref-flag-btn make-ahead-btn${isMakeAhead ? ' active' : ''}">Make Ahead</button>
-          <button class="pref-flag-btn slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
-          <button class="pref-flag-btn instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
+          <p class="tags-edit-hint">Click a tag to turn it on or off. \u2728 means auto-detected.</p>
+          <button class="pref-flag-btn toggle-pill make-ahead-btn${isMakeAhead ? ' active' : ''}">Make Ahead</button>
+          <button class="pref-flag-btn toggle-pill slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
+          <button class="pref-flag-btn toggle-pill instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
         </div>
       </details>
       ${onDelete ? '<button class="card-trash-btn" title="Delete recipe">&#128465;</button>' : ''}
@@ -139,12 +148,43 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       });
     });
 
+    // Refresh the chip strip from current pref state (called after a toggle).
+    function refreshConvenienceChips() {
+      const chipsContainer = card.querySelector('.allergen-chips');
+      const updatedPref = preferences[r.uid] || {};
+      const sc = isSlowCooker(r, updatedPref);
+      const ip = isInstantPot(r, updatedPref);
+      const ma = updatedPref.makeAhead;
+      const scOver = updatedPref.slowCooker === true || updatedPref.slowCooker === false;
+      const ipOver = updatedPref.instantPot === true || updatedPref.instantPot === false;
+
+      const newChips = [];
+      if (timeChipHtml) newChips.push(timeChipHtml);
+      if (sc) newChips.push(`<span class="time-chip" title="${scOver ? 'Manual override' : 'Auto-detected'}">Slow Cooker${scOver ? '' : ' \u2728'}</span>`);
+      if (ip) newChips.push(`<span class="time-chip" title="${ipOver ? 'Manual override' : 'Auto-detected'}">Instant Pot${ipOver ? '' : ' \u2728'}</span>`);
+      if (ma) newChips.push(`<span class="time-chip">Make Ahead</span>`);
+
+      const newAllChips = allergenChips + dietChips + newChips.join('');
+      if (chipsContainer) {
+        chipsContainer.innerHTML = newAllChips;
+      } else if (newAllChips) {
+        // Chips area didn't exist before — insert it after the name
+        const div = document.createElement('div');
+        div.className = 'allergen-chips';
+        div.innerHTML = newAllChips;
+        card.querySelector('.recipe-card-name').after(div);
+      }
+    }
+
     // Make Ahead
     card.querySelector('.make-ahead-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
       if (onToggleMakeAhead) {
         await onToggleMakeAhead(r.uid);
+        // Update local preferences cache so refreshConvenienceChips sees the change
+        preferences[r.uid] = { ...(preferences[r.uid] || {}), makeAhead: !(preferences[r.uid]?.makeAhead) };
         e.target.classList.toggle('active');
+        refreshConvenienceChips();
       }
     });
 
@@ -153,11 +193,17 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       e.stopPropagation();
       if (onToggleSlowCooker) {
         const newState = await onToggleSlowCooker(r.uid, r);
+        // Mirror the override into the local preferences cache so chip refresh is correct
+        const auto = isSlowCooker(r, {}); // auto-detect with no override
+        preferences[r.uid] = { ...(preferences[r.uid] || {}) };
+        if (newState === auto) delete preferences[r.uid].slowCooker;
+        else preferences[r.uid].slowCooker = newState;
+
         e.target.classList.toggle('active', newState);
-        const updatedPref = preferences[r.uid] || {};
-        const overridden = updatedPref.slowCooker === true || updatedPref.slowCooker === false;
+        const overridden = preferences[r.uid].slowCooker === true || preferences[r.uid].slowCooker === false;
         e.target.title = overridden ? 'Manual override' : 'Auto-detected';
         e.target.textContent = `Slow Cooker${overridden ? '' : ' \u2728'}`;
+        refreshConvenienceChips();
       }
     });
 
@@ -166,11 +212,16 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       e.stopPropagation();
       if (onToggleInstantPot) {
         const newState = await onToggleInstantPot(r.uid, r);
+        const auto = isInstantPot(r, {});
+        preferences[r.uid] = { ...(preferences[r.uid] || {}) };
+        if (newState === auto) delete preferences[r.uid].instantPot;
+        else preferences[r.uid].instantPot = newState;
+
         e.target.classList.toggle('active', newState);
-        const updatedPref = preferences[r.uid] || {};
-        const overridden = updatedPref.instantPot === true || updatedPref.instantPot === false;
+        const overridden = preferences[r.uid].instantPot === true || preferences[r.uid].instantPot === false;
         e.target.title = overridden ? 'Manual override' : 'Auto-detected';
         e.target.textContent = `Instant Pot${overridden ? '' : ' \u2728'}`;
+        refreshConvenienceChips();
       }
     });
 

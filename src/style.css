@@ -777,7 +777,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   background: var(--primary-light, #e8f0e3);
   color: var(--primary, #4a6b3a);
   border: 0.8px solid var(--green-mid, #b8cca5);
-  margin-left: 0.4rem;
   white-space: nowrap;
 }
 
@@ -785,6 +784,32 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
+}
+
+/* Toggle-pill variant: makes off vs on visually unmistakable
+   for the editable Tag buttons in the recipe card details. */
+.pref-flag-btn.toggle-pill {
+  background: transparent;
+  color: var(--text-light, #888);
+  border: 1px dashed var(--border, #ccc);
+  opacity: 0.7;
+}
+.pref-flag-btn.toggle-pill.active {
+  background: var(--primary-light, #e8f0e3);
+  color: var(--primary-dark, #2f4a23);
+  border: 1px solid var(--primary, #4a6b3a);
+  opacity: 1;
+  font-weight: 500;
+}
+.pref-flag-btn.toggle-pill:hover {
+  opacity: 1;
+}
+
+.tags-edit-hint {
+  font-size: 0.72rem;
+  color: var(--text-light, #888);
+  margin: 0 0 0.5rem;
+  font-style: italic;
 }
 
 /* Allergen warning in planner */
