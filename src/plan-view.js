@@ -1,6 +1,7 @@
 import { loadCommittedPlan } from './firebase.js';
 import { getRecipeByUid } from './recipes.js';
 import { getWeekKey, getWeekLabel } from './planner.js';
+import { getConvenienceLabel } from './convenience.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -75,7 +76,9 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
       : (recipe ? recipe.name : 'No meal planned');
 
     const flags = [];
-    if (dayData.makeAhead) flags.push('Make ahead');
+    // Back-compat: old plans had a boolean makeAhead field; new plans use convenience.
+    const conv = dayData.convenience || (dayData.makeAhead ? 'make-ahead' : '');
+    if (conv) flags.push(getConvenienceLabel(conv));
 
     const sides = dayData.sides ? `<span class="meal-sides">+ ${escHtml(dayData.sides)}</span>` : '';
 

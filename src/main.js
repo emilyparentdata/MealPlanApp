@@ -4,6 +4,7 @@ import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, to
 import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
+import { getConvenienceLabel } from './convenience.js';
 
 // === State ===
 const BETA_CODE = 'MEALS2026';
@@ -453,10 +454,17 @@ function setupPlannerPage() {
     const result = await suggestAllMeals(document.getElementById('planner-grid'), members);
     refreshPlanner();
 
-    const makeAheadBlanks = (result?.unfilled || []).filter(u => u.reason === 'no-make-ahead-matches');
-    if (makeAheadBlanks.length) {
-      const days = makeAheadBlanks.map(u => u.day).join(', ');
-      showToast(`${days} left blank: no recipes are tagged "Make ahead". Tag favorites in Recipes → Preferences to enable this filter.`, 8000);
+    const convBlanks = (result?.unfilled || []).filter(u => u.reason === 'no-convenience-matches');
+    if (convBlanks.length) {
+      // Group by which convenience filter blocked them, so the toast can name each one
+      const byFilter = {};
+      for (const u of convBlanks) {
+        (byFilter[u.convenience] ||= []).push(u.day);
+      }
+      const parts = Object.entries(byFilter).map(([conv, days]) =>
+        `${days.join(', ')} (no recipes match "${getConvenienceLabel(conv)}")`
+      );
+      showToast(`Left blank: ${parts.join('; ')}. Adjust filters or tag recipes in Recipes → Preferences.`, 9000);
     } else {
       showToast('Menu suggested! Avoids repeated proteins and recent meals.');
     }

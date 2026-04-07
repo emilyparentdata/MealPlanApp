@@ -1,7 +1,11 @@
 import { saveRecipePrefs, loadAllPreferences, getMembers } from './firebase.js';
 import { getRecipes } from './recipes.js';
+import { isSlowCooker, isInstantPot, autoDetectSlowCooker, autoDetectInstantPot } from './convenience.js';
 
-// Keyed by recipeUid: { doesntEat: [...members], makeAhead: bool, favorite: bool }
+// Keyed by recipeUid: { doesntEat: [...members], makeAhead: bool, favorite: bool,
+//                       slowCooker: bool|undefined, instantPot: bool|undefined }
+// For slowCooker/instantPot: undefined = auto-detect from recipe text,
+//                            true/false = manual override.
 let preferences = {};
 
 export async function initPreferences() {
@@ -47,6 +51,32 @@ export async function toggleMakeAhead(recipeUid) {
   return current.makeAhead;
 }
 
+// Toggles a method tag (slowCooker / instantPot). The button shows the current
+// effective state. Clicking flips it. If the new state matches auto-detection,
+// the override is cleared (field deleted); otherwise the override is stored.
+async function toggleMethodTag(recipeUid, recipe, field, autoDetectFn) {
+  const current = getRecipePrefs(recipeUid);
+  const auto = autoDetectFn(recipe);
+  const overridden = current[field] === true || current[field] === false;
+  const effective = overridden ? current[field] : auto;
+  const newEffective = !effective;
+  if (newEffective === auto) {
+    delete current[field];
+  } else {
+    current[field] = newEffective;
+  }
+  await updateRecipePrefs(recipeUid, current);
+  return newEffective;
+}
+
+export async function toggleSlowCooker(recipeUid, recipe) {
+  return toggleMethodTag(recipeUid, recipe, 'slowCooker', autoDetectSlowCooker);
+}
+
+export async function toggleInstantPot(recipeUid, recipe) {
+  return toggleMethodTag(recipeUid, recipe, 'instantPot', autoDetectInstantPot);
+}
+
 export function renderPreferenceList(container, recipes, searchQuery, showUnratedOnly) {
   container.innerHTML = '';
   const members = getMembers();
@@ -70,6 +100,10 @@ export function renderPreferenceList(container, recipes, searchQuery, showUnrate
 
   for (const r of filtered) {
     const prefs = getRecipePrefs(r.uid);
+    const slowCookerOn = isSlowCooker(r, prefs);
+    const instantPotOn = isInstantPot(r, prefs);
+    const slowCookerOverridden = prefs.slowCooker === true || prefs.slowCooker === false;
+    const instantPotOverridden = prefs.instantPot === true || prefs.instantPot === false;
 
     const row = document.createElement('div');
     row.className = 'pref-row';
@@ -84,6 +118,8 @@ export function renderPreferenceList(container, recipes, searchQuery, showUnrate
         </div>
         <div class="pref-flags">
           <button class="flag-btn ${prefs.makeAhead ? 'active' : ''}" data-action="makeAhead">Make Ahead</button>
+          <button class="flag-btn ${slowCookerOn ? 'active' : ''}" data-action="slowCooker" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
+          <button class="flag-btn ${instantPotOn ? 'active' : ''}" data-action="instantPot" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
           <button class="flag-btn fav-flag ${prefs.favorite ? 'active' : ''}" data-action="favorite">\u2764 Favorite</button>
         </div>
       </div>
@@ -102,6 +138,28 @@ export function renderPreferenceList(container, recipes, searchQuery, showUnrate
     row.querySelector('[data-action="makeAhead"]').addEventListener('click', async (e) => {
       await toggleMakeAhead(r.uid);
       e.target.classList.toggle('active');
+      showToast('Saved');
+    });
+
+    // Slow cooker toggle (auto-detected, can be overridden)
+    row.querySelector('[data-action="slowCooker"]').addEventListener('click', async (e) => {
+      const newState = await toggleSlowCooker(r.uid, r);
+      e.target.classList.toggle('active', newState);
+      const updatedPrefs = getRecipePrefs(r.uid);
+      const overridden = updatedPrefs.slowCooker === true || updatedPrefs.slowCooker === false;
+      e.target.title = overridden ? 'Manual override' : 'Auto-detected';
+      e.target.textContent = `Slow Cooker${overridden ? '' : ' \u2728'}`;
+      showToast('Saved');
+    });
+
+    // Instant pot toggle (auto-detected, can be overridden)
+    row.querySelector('[data-action="instantPot"]').addEventListener('click', async (e) => {
+      const newState = await toggleInstantPot(r.uid, r);
+      e.target.classList.toggle('active', newState);
+      const updatedPrefs = getRecipePrefs(r.uid);
+      const overridden = updatedPrefs.instantPot === true || updatedPrefs.instantPot === false;
+      e.target.title = overridden ? 'Manual override' : 'Auto-detected';
+      e.target.textContent = `Instant Pot${overridden ? '' : ' \u2728'}`;
       showToast('Saved');
     });
 

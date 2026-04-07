@@ -1,6 +1,7 @@
 import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
 import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, getRestrictions } from './firebase.js';
+import { CONVENIENCE_OPTIONS, getConvenienceLabel, recipeMatchesConvenience } from './convenience.js';
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -153,6 +154,9 @@ export async function renderPlanner(container, members) {
 
     const whoHome = dayData.whoHome || [...plannerMembers];
 
+    // Back-compat: old plans had a boolean makeAhead. Migrate to convenience.
+    const convenience = dayData.convenience || (dayData.makeAhead ? 'make-ahead' : '');
+
     const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
     const selectedRecipe = dayData.recipeUid ? recipes.find(r => r.uid === dayData.recipeUid) : null;
 
@@ -169,7 +173,12 @@ export async function renderPlanner(container, members) {
             <label><input type="checkbox" data-member="${escAttr(m)}" ${whoHome.includes(m) ? 'checked' : ''}> ${escHtml(m)}</label>
           `).join('')}
         </div>
-        <label><input type="checkbox" class="make-ahead" ${dayData.makeAhead ? 'checked' : ''}> Make ahead</label>
+        <label class="convenience-label">
+          Convenience:
+          <select class="convenience-select">
+            ${CONVENIENCE_OPTIONS.map(o => `<option value="${o.value}" ${convenience === o.value ? 'selected' : ''}>${escHtml(o.label)}</option>`).join('')}
+          </select>
+        </label>
         <select class="day-status-select">
           <option value="">Cooking</option>
           <option value="skip" ${dayData.skip === true || dayData.skip === 'skip' ? 'selected' : ''}>Skip</option>
@@ -244,6 +253,7 @@ export async function renderPlanner(container, members) {
 
     dayEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', saveDay));
     dayEl.querySelector('.day-status-select').addEventListener('change', saveDay);
+    dayEl.querySelector('.convenience-select').addEventListener('change', saveDay);
     dayEl.querySelector('.sides-input').addEventListener('change', saveDay);
     dayEl.querySelector('.servings-select').addEventListener('change', saveDay);
 
@@ -266,15 +276,16 @@ export async function renderPlanner(container, members) {
         await savePlan(weekKey, plan);
         refreshDropdownMarkers(container, plan, recipes);
         updateAllergenWarnings();
-      } else if (result && result.reason === 'no-make-ahead-matches') {
-        // Surface the make-ahead filter explanation inline on the day
+      } else if (result && result.reason === 'no-convenience-matches') {
+        // Surface the convenience filter explanation inline on the day
         const errEl = dayEl.querySelector('.suggest-error') || (() => {
           const el = document.createElement('div');
           el.className = 'suggest-error';
           dayEl.querySelector('.suggest-btn').after(el);
           return el;
         })();
-        errEl.textContent = 'No recipes tagged "Make ahead". Tag favorites in Recipes → Preferences.';
+        const label = getConvenienceLabel(result.convenience);
+        errEl.textContent = `No recipes match "${label}". Adjust the filter or tag recipes in Recipes → Preferences.`;
         errEl.style.cssText = 'font-size:0.75rem;color:#a05a00;margin-top:0.25rem;';
       }
     });
@@ -399,7 +410,7 @@ function getDayDataFromEl(dayEl, members) {
   });
   return {
     whoHome,
-    makeAhead: dayEl.querySelector('.make-ahead')?.checked || false,
+    convenience: dayEl.querySelector('.convenience-select')?.value || '',
     skip: dayEl.querySelector('.day-status-select')?.value || false,
     recipeUid: dayEl.querySelector('.meal-combo')?.dataset.recipeUid || '',
     sides: dayEl.querySelector('.sides-input')?.value || '',
@@ -449,16 +460,16 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
   const prefs = getAllPreferences();
 
   const scored = [];
-  let filteredByMakeAhead = 0;
+  let filteredByConvenience = 0;
   for (const recipe of recipes) {
     // Don't repeat within the same week
     if (assignedThisWeek.has(recipe.uid)) continue;
 
     const recipePref = prefs[recipe.uid] || {};
 
-    // Check constraints
-    if (dayData.makeAhead && !recipePref.makeAhead) {
-      filteredByMakeAhead++;
+    // Convenience filter (Slow cooker, Instant Pot, Quick, Make ahead, ...)
+    if (dayData.convenience && !recipeMatchesConvenience(recipe, recipePref, dayData.convenience)) {
+      filteredByConvenience++;
       continue;
     }
 
@@ -503,9 +514,9 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
   }
 
   if (!scored.length) {
-    // Distinguish "make-ahead filter blocked everything" so the UI can explain.
-    if (dayData.makeAhead && filteredByMakeAhead > 0) {
-      return { recipe: null, reason: 'no-make-ahead-matches' };
+    // Distinguish "convenience filter blocked everything" so the UI can explain which one.
+    if (dayData.convenience && filteredByConvenience > 0) {
+      return { recipe: null, reason: 'no-convenience-matches', convenience: dayData.convenience };
     }
     return { recipe: null, reason: 'no-matches' };
   }
@@ -543,7 +554,7 @@ export async function suggestAllMeals(container, members) {
         plan.days[dayName] = getDayDataFromEl(dayEl, members);
         plan.days[dayName].recipeUid = result.recipe.uid;
       } else if (result && result.reason && result.reason !== 'skip') {
-        unfilled.push({ day: dayName, reason: result.reason });
+        unfilled.push({ day: dayName, reason: result.reason, convenience: result.convenience });
       }
     }
   }
