@@ -219,7 +219,16 @@ const UNITS = ['cups?', 'tbsp', 'tsp', 'tablespoons?', 'teaspoons?', 'oz', 'ounc
   'pinch(?:es)?', 'bunch(?:es)?', 'handfuls?', 'sticks?', 'bags?', 'bottles?', 'jars?', 'pieces?'];
 const UNIT_RE = new RegExp(`^(${UNITS.join('|')})\\b\\.?\\s*(?:of\\s+)?`, 'i');
 
-const PREP_WORDS = /\b(finely|roughly|thinly|freshly|lightly|well|coarsely)?\s*-?\s*(diced|chopped|minced|sliced|grated|shredded|crushed|julienned|cubed|halved|quartered|trimmed|peeled|seeded|deveined|deboned|thawed|frozen|fresh|dried|ground|cooked|uncooked|warm|warmed|cold|softened|melted|room temperature|to taste|optional|divided|packed|sifted|beaten|whisked|juiced|zested|squeezed|rinsed|drained|pitted|cored|stemmed|cleaned|washed|torn|cut into.*|about|toasted|roasted|unsalted|low-sodium|low sodium|reduced-sodium|boneless|skinless|skin-on|bone-in|thin-cut|thick-cut|store-bought|good-quality|pickled|smoked|jarred|opened|oil-packed|oil packed|sun-dried|sundried|fine|finely|roughly|thinly|freshly|lightly|coarsely)\b/gi;
+// Words that describe how an ingredient is prepared but don't change which
+// product you buy at the store — safe to strip from the ingredient name.
+//
+// IMPORTANT: do NOT add words here that change the SKU. Things like "ground"
+// (ground beef vs beef), "smoked" (smoked paprika vs paprika), "unsalted"
+// (unsalted butter vs salted butter), "fresh"/"dried" (fresh basil vs dried
+// basil), "boneless"/"skinless", "low-sodium", "sun-dried", "oil-packed",
+// "toasted", "roasted", "pickled", "frozen" — these are all things you
+// pick at the store, not in the kitchen, so they must stay in the name.
+const PREP_WORDS = /\b(finely|roughly|thinly|freshly|lightly|well|coarsely)?\s*-?\s*(diced|chopped|minced|sliced|grated|shredded|crushed|julienned|cubed|halved|quartered|trimmed|peeled|seeded|deveined|deboned|thawed|warm|warmed|cold|softened|melted|room temperature|to taste|optional|divided|packed|sifted|beaten|whisked|juiced|zested|squeezed|rinsed|drained|pitted|cored|stemmed|cleaned|washed|torn|cut into.*|about|jarred|opened|fine|finely|roughly|thinly|freshly|lightly|coarsely)\b/gi;
 
 function parseFraction(s) {
   s = s.trim();
@@ -461,30 +470,97 @@ function isStapleDairy(name) {
   return STAPLE_DAIRY.some(s => lower === s || lower.startsWith(s + ' ') || lower.endsWith(' ' + s));
 }
 
+// Unit conversions used to merge cross-unit quantities for the same
+// ingredient before display. Each rule says: N of `smaller` = 1 of `larger`.
+// `upConvert(total)` returns the larger-unit amount if conversion gives a
+// "clean" result, or null to leave the quantity in the smaller unit.
+//
+// e.g. "1 head garlic" + "5 cloves garlic" → 15 cloves total → 1.5 heads.
+//      "11 cloves + 5 cloves" → 16 cloves → 1.5 heads.
+//      "8 cloves" → stays as "8 cloves" (less than a full head).
+//      "6 tbsp + 4 tbsp" → 10 tbsp (not a clean cup fraction → stays).
+//      "6 tbsp + 6 tbsp" → 12 tbsp → 3/4 cup (clean).
+const UNIT_CONVERSIONS = [
+  {
+    smaller: 'tsp', larger: 'tbsp', ratio: 3,
+    // Only when the total is a clean multiple of 3 tsp
+    upConvert: (total) => (total >= 3 && total % 3 === 0) ? total / 3 : null,
+  },
+  {
+    smaller: 'tbsp', larger: 'cup', ratio: 16,
+    // Only at half-cup or larger AND a clean quarter-cup multiple
+    upConvert: (total) => (total >= 8 && total % 4 === 0) ? total / 16 : null,
+  },
+  {
+    smaller: 'oz', larger: 'lb', ratio: 16,
+    // Only at one pound or more AND a clean half-pound multiple
+    upConvert: (total) => (total >= 16 && total % 8 === 0) ? total / 16 : null,
+  },
+  {
+    smaller: 'clove', larger: 'head', ratio: 10,
+    // At 10+ cloves, round to the nearest half-head — what shoppers buy
+    upConvert: (total) => total >= 10 ? Math.round(total * 2 / 10) / 2 : null,
+  },
+];
+
+// Take a list of {qty, unit} pairs (possibly across different units for the
+// same ingredient) and return a simplified list with cross-unit quantities
+// merged via UNIT_CONVERSIONS, plus optional up-conversion to a larger unit.
+// Quantities with qty === null are passed through untouched.
+function harmonizeQuantities(quantities) {
+  // Step 1: split into "measured" (qty != null) and "unmeasured" (qty == null)
+  let measured = quantities.filter(q => q.qty !== null).map(q => ({ ...q }));
+  const unmeasured = quantities.filter(q => q.qty === null);
+
+  // Step 2: down-convert larger units to smaller for any rule where both
+  // units are present, so summing is meaningful.
+  for (const conv of UNIT_CONVERSIONS) {
+    const hasSmaller = measured.some(q => q.unit === conv.smaller);
+    const hasLarger = measured.some(q => q.unit === conv.larger);
+    if (hasSmaller && hasLarger) {
+      measured = measured.map(q =>
+        q.unit === conv.larger ? { qty: q.qty * conv.ratio, unit: conv.smaller } : q
+      );
+    }
+  }
+
+  // Step 3: sum within each unit
+  const totals = new Map(); // unit -> total qty
+  for (const q of measured) {
+    totals.set(q.unit, (totals.get(q.unit) || 0) + q.qty);
+  }
+
+  // Step 4: up-convert when the total is a "clean" amount in the larger unit
+  for (const conv of UNIT_CONVERSIONS) {
+    const total = totals.get(conv.smaller);
+    if (total == null) continue;
+    const largerQty = conv.upConvert(total);
+    if (largerQty != null) {
+      totals.delete(conv.smaller);
+      totals.set(conv.larger, (totals.get(conv.larger) || 0) + largerQty);
+    }
+  }
+
+  // Step 5: return as a quantities array
+  const result = Array.from(totals.entries()).map(([unit, qty]) => ({ qty, unit }));
+  // Preserve unmeasured entries so the display still notes them somehow
+  return [...result, ...unmeasured];
+}
+
 function buildDisplayText(entry, suppressQty = false) {
   const { name, quantities } = entry;
   if (suppressQty) return name;
 
-  // Group quantities by unit
-  const byUnit = new Map();
-  for (const q of quantities) {
-    const u = q.unit || '';
-    if (!byUnit.has(u)) byUnit.set(u, []);
-    byUnit.get(u).push(q.qty);
-  }
+  // Harmonize cross-unit quantities (e.g. cloves + heads → heads)
+  const harmonized = harmonizeQuantities(quantities);
 
   const parts = [];
-  for (const [unit, qtys] of byUnit) {
-    const validQtys = qtys.filter(q => q !== null);
-    if (validQtys.length === 0) {
-      // No quantities at all for this unit group — skip the quantity
-      continue;
-    }
-    const total = validQtys.reduce((sum, q) => sum + q, 0);
+  for (const q of harmonized) {
+    if (q.qty === null) continue; // unmeasured entries don't add a quantity to the display
+    const total = q.qty;
     const formatted = formatQuantity(total);
-    if (unit) {
-      // Pluralize unit if needed
-      const displayUnit = total > 1 ? pluralizeUnit(unit) : unit;
+    if (q.unit) {
+      const displayUnit = total > 1 ? pluralizeUnit(q.unit) : q.unit;
       parts.push(`${formatted} ${displayUnit}`);
     } else {
       parts.push(formatted);
