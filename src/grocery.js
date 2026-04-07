@@ -590,16 +590,20 @@ function buildGroceryText(meals) {
   }
   lines.push('');
 
-  // Grocery list (respect edits and deletes)
+  // Grocery list (respect edits, deletes, and checks)
+  // Checked items are treated as "I already have this" and excluded
+  // from the copied output, matching how deletes already work.
   const editsKey = `grocery_edits_${currentWeekKey}`;
   const edits = JSON.parse(localStorage.getItem(editsKey) || '{}');
   const deletesKey = `grocery_deletes_${currentWeekKey}`;
   const deletes = JSON.parse(localStorage.getItem(deletesKey) || '{}');
+  const checkedKey = `grocery_checked_${currentWeekKey}`;
+  const checked = JSON.parse(localStorage.getItem(checkedKey) || '{}');
 
   lines.push('GROCERY LIST');
   lines.push('-'.repeat(30));
   for (const [category, items] of groups) {
-    const visible = items.filter(item => !deletes[item.key]);
+    const visible = items.filter(item => !deletes[item.key] && !checked[item.key]);
     if (!visible.length) continue;
     if (category) {
       lines.push('');
@@ -612,12 +616,17 @@ function buildGroceryText(meals) {
     }
   }
 
-  // Extra items
+  // Extra items (also exclude checked)
   if (extraItems.length) {
-    lines.push('');
-    lines.push('EXTRA ITEMS');
-    for (const item of extraItems) {
-      lines.push(`[ ] ${item}`);
+    const extrasCheckedKey = currentWeekKey ? `grocery_extras_checked_${currentWeekKey}` : 'grocery_extras_checked';
+    const extrasChecked = JSON.parse(localStorage.getItem(extrasCheckedKey) || '{}');
+    const visibleExtras = extraItems.filter((_, idx) => !extrasChecked[idx]);
+    if (visibleExtras.length) {
+      lines.push('');
+      lines.push('EXTRA ITEMS');
+      for (const item of visibleExtras) {
+        lines.push(`[ ] ${item}`);
+      }
     }
   }
 

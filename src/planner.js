@@ -255,8 +255,9 @@ export async function renderPlanner(container, members) {
       const recentUids = await getRecentRecipeUids();
       const assigned = collectAssignedThisWeek(plan, dayName);
       const assignedProteins = collectAssignedProteins(plan, dayName);
-      const suggested = suggestMealForDay(dayEl, members, recentUids, assigned, assignedProteins, useUpItems);
-      if (suggested) {
+      const result = suggestMealForDay(dayEl, members, recentUids, assigned, assignedProteins, useUpItems);
+      if (result && result.recipe) {
+        const suggested = result.recipe;
         setComboValue(dayEl, suggested.uid, suggested.name);
         plan.days[dayName] = getDayDataFromEl(dayEl, members);
         plan.days[dayName].recipeUid = suggested.uid;
@@ -265,6 +266,16 @@ export async function renderPlanner(container, members) {
         await savePlan(weekKey, plan);
         refreshDropdownMarkers(container, plan, recipes);
         updateAllergenWarnings();
+      } else if (result && result.reason === 'no-make-ahead-matches') {
+        // Surface the make-ahead filter explanation inline on the day
+        const errEl = dayEl.querySelector('.suggest-error') || (() => {
+          const el = document.createElement('div');
+          el.className = 'suggest-error';
+          dayEl.querySelector('.suggest-btn').after(el);
+          return el;
+        })();
+        errEl.textContent = 'No recipes tagged "Make ahead". Tag favorites in Recipes → Preferences.';
+        errEl.style.cssText = 'font-size:0.75rem;color:#a05a00;margin-top:0.25rem;';
       }
     });
 
@@ -432,12 +443,13 @@ function collectAssignedProteins(plan, excludeDay) {
 
 function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems = []) {
   const dayData = getDayDataFromEl(dayEl, members);
-  if (dayData.skip === true || dayData.skip === 'skip' || dayData.skip === 'leftovers') return null;
+  if (dayData.skip === true || dayData.skip === 'skip' || dayData.skip === 'leftovers') return { recipe: null, reason: 'skip' };
 
   const recipes = getRecipes();
   const prefs = getAllPreferences();
 
   const scored = [];
+  let filteredByMakeAhead = 0;
   for (const recipe of recipes) {
     // Don't repeat within the same week
     if (assignedThisWeek.has(recipe.uid)) continue;
@@ -445,7 +457,10 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     const recipePref = prefs[recipe.uid] || {};
 
     // Check constraints
-    if (dayData.makeAhead && !recipePref.makeAhead) continue;
+    if (dayData.makeAhead && !recipePref.makeAhead) {
+      filteredByMakeAhead++;
+      continue;
+    }
 
     // Skip if anyone home doesn't eat this
     const doesntEat = recipePref.doesntEat || [];
@@ -487,13 +502,19 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     scored.push({ recipe, score });
   }
 
-  if (!scored.length) return null;
+  if (!scored.length) {
+    // Distinguish "make-ahead filter blocked everything" so the UI can explain.
+    if (dayData.makeAhead && filteredByMakeAhead > 0) {
+      return { recipe: null, reason: 'no-make-ahead-matches' };
+    }
+    return { recipe: null, reason: 'no-matches' };
+  }
 
   // Sort by score descending, pick randomly from the top tier
   scored.sort((a, b) => b.score - a.score);
   const topScore = scored[0].score;
   const topTier = scored.filter(s => s.score >= topScore - 1);
-  return topTier[Math.floor(Math.random() * topTier.length)].recipe;
+  return { recipe: topTier[Math.floor(Math.random() * topTier.length)].recipe, reason: null };
 }
 
 // === Suggest full week menu ===
@@ -505,6 +526,7 @@ export async function suggestAllMeals(container, members) {
   const useUpItems = await loadUseUpItems(weekKey);
 
   const dayEls = container.querySelectorAll('.planner-day');
+  const unfilled = []; // { day, reason }
 
   // Process days sequentially so each day's pick informs the next
   for (let i = 0; i < dayEls.length; i++) {
@@ -516,10 +538,12 @@ export async function suggestAllMeals(container, members) {
     if (!currentMeal && !isSkip) {
       const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
       const assignedProteins = collectAssignedProteins(plan, dayName);
-      const suggested = suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems);
-      if (suggested) {
+      const result = suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems);
+      if (result && result.recipe) {
         plan.days[dayName] = getDayDataFromEl(dayEl, members);
-        plan.days[dayName].recipeUid = suggested.uid;
+        plan.days[dayName].recipeUid = result.recipe.uid;
+      } else if (result && result.reason && result.reason !== 'skip') {
+        unfilled.push({ day: dayName, reason: result.reason });
       }
     }
   }
@@ -527,6 +551,7 @@ export async function suggestAllMeals(container, members) {
   plan.weekKey = weekKey;
   plan.updated = Date.now();
   await savePlan(weekKey, plan);
+  return { unfilled };
 }
 
 function escHtml(str) {

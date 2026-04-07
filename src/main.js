@@ -450,9 +450,16 @@ function setupPlannerPage() {
   });
 
   document.getElementById('suggest-all-btn').addEventListener('click', async () => {
-    await suggestAllMeals(document.getElementById('planner-grid'), members);
+    const result = await suggestAllMeals(document.getElementById('planner-grid'), members);
     refreshPlanner();
-    showToast('Menu suggested! Avoids repeated proteins and recent meals.');
+
+    const makeAheadBlanks = (result?.unfilled || []).filter(u => u.reason === 'no-make-ahead-matches');
+    if (makeAheadBlanks.length) {
+      const days = makeAheadBlanks.map(u => u.day).join(', ');
+      showToast(`${days} left blank: no recipes are tagged "Make ahead". Tag favorites in Recipes → Preferences to enable this filter.`, 8000);
+    } else {
+      showToast('Menu suggested! Avoids repeated proteins and recent meals.');
+    }
   });
   document.getElementById('clear-all-btn').addEventListener('click', async () => {
     const { savePlan: sp, loadPlan: lp } = await import('./firebase.js');
@@ -1282,6 +1289,7 @@ function setupSharedPacks() {
       <h4>${escManage(loadedPack.name)}</h4>
       <p>${loadedPack.recipes.length} recipe${loadedPack.recipes.length === 1 ? '' : 's'} in this pack.
         Select the ones you want to import.</p>
+      <p class="shared-import-note">Imported recipes become your own editable copies — edits and notes you add stay on your version and don't affect anyone else.</p>
       <div class="shared-select-actions">
         <button class="btn shared-select-all">Select All</button>
         <button class="btn shared-select-none">Select None</button>
@@ -1539,11 +1547,11 @@ function setupScanImport() {
     imagePreview.innerHTML = `<img src="${thumbUrl}" class="scan-image-thumb" alt="Recipe photo">`;
 
     try {
-      const base64 = await fileToBase64(file);
+      const { base64, mimeType } = await prepareImageForScan(file);
       const scanRecipe = firebase.functions().httpsCallable('scanRecipe');
       const response = await scanRecipe({
         imageBase64: base64,
-        mimeType: file.type || 'image/jpeg',
+        mimeType,
       });
 
       const recipe = response.data;
@@ -1612,10 +1620,10 @@ function setupScanImport() {
       statusEl.className = 'scan-bulk-status active';
 
       try {
-        const base64 = await fileToBase64(files[i]);
+        const { base64, mimeType } = await prepareImageForScan(files[i]);
         const response = await scanRecipe({
           imageBase64: base64,
-          mimeType: files[i].type || 'image/jpeg',
+          mimeType,
         });
 
         const recipe = response.data;
@@ -1804,17 +1812,58 @@ function setupScanImport() {
   }
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
+// Downscale + re-encode an image so it fits comfortably under the
+// scanRecipe Cloud Function's 10MB base64 limit. iPhone screenshots
+// (especially with food photos) routinely exceed that at native res.
+// Returns { base64, mimeType }.
+async function prepareImageForScan(file) {
+  const MAX_DIMENSION = 1600;
+  const JPEG_QUALITY = 0.85;
+
+  const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      // Strip the data URL prefix (data:image/jpeg;base64,)
-      const base64 = reader.result.split(',')[1];
-      resolve(base64);
-    };
+    reader.onload = () => resolve(reader.result);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = dataUrl;
+  });
+
+  let { width, height } = img;
+  const longest = Math.max(width, height);
+  const needsResize = longest > MAX_DIMENSION;
+
+  if (needsResize) {
+    const scale = MAX_DIMENSION / longest;
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+
+  // If the image is already small AND its base64 is well under the limit,
+  // skip the canvas re-encode to preserve original quality.
+  if (!needsResize) {
+    const base64 = dataUrl.split(',')[1];
+    if (base64.length < 8 * 1024 * 1024) {
+      return { base64, mimeType: file.type || 'image/jpeg' };
+    }
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const resizedDataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+  return {
+    base64: resizedDataUrl.split(',')[1],
+    mimeType: 'image/jpeg',
+  };
 }
 
 // === Import Parsing ===
@@ -2524,12 +2573,12 @@ function exportRecipesToFile(recipes, filename) {
 }
 
 // === Toast ===
-function showToast(msg) {
+function showToast(msg, durationMs = 3000) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
   toast.classList.remove('hidden');
   clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => toast.classList.add('hidden'), 3000);
+  toast._timer = setTimeout(() => toast.classList.add('hidden'), durationMs);
 }
 
 // === Start ===
