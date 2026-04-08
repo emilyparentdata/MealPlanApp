@@ -1597,33 +1597,75 @@ function setupSharedPacks() {
     listEl.innerHTML = packs.map(p => {
       const date = new Date(p.createdAt).toLocaleDateString();
       return `
-        <div class="created-pack-row" data-code="${escAttr(p.code)}">
-          <div class="created-pack-info">
-            <strong>${escManage(p.name)}</strong>
-            <span class="section-help">${p.recipeCount} recipe${p.recipeCount === 1 ? '' : 's'} \u00b7 ${date}</span>
+        <div class="created-pack-wrap" data-code="${escAttr(p.code)}">
+          <div class="created-pack-row">
+            <div class="created-pack-info">
+              <strong>${escManage(p.name)}</strong>
+              <span class="section-help">${p.recipeCount} recipe${p.recipeCount === 1 ? '' : 's'} \u00b7 ${date}</span>
+            </div>
+            <div class="created-pack-actions">
+              <code class="created-pack-code">${escManage(p.code)}</code>
+              <button class="btn created-pack-view" type="button">View</button>
+              <button class="btn created-pack-copy" type="button">Copy</button>
+              <button class="btn created-pack-remove" type="button" title="Remove from list">&times;</button>
+            </div>
           </div>
-          <div class="created-pack-actions">
-            <code class="created-pack-code">${escManage(p.code)}</code>
-            <button class="btn created-pack-copy" type="button">Copy</button>
-            <button class="btn created-pack-remove" type="button" title="Remove from list">&times;</button>
-          </div>
+          <div class="created-pack-detail hidden"></div>
         </div>
       `;
     }).join('');
 
     listEl.querySelectorAll('.created-pack-copy').forEach(btn => {
       btn.addEventListener('click', () => {
-        const code = btn.closest('.created-pack-row').dataset.code;
+        const code = btn.closest('.created-pack-wrap').dataset.code;
         navigator.clipboard.writeText(code);
         showToast('Code copied!');
       });
     });
     listEl.querySelectorAll('.created-pack-remove').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const code = btn.closest('.created-pack-row').dataset.code;
+        const code = btn.closest('.created-pack-wrap').dataset.code;
         const { removeCreatedPack } = await import('./firebase.js');
         await removeCreatedPack(code);
         renderCreatedPacksList();
+      });
+    });
+    listEl.querySelectorAll('.created-pack-view').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const wrap = btn.closest('.created-pack-wrap');
+        const detail = wrap.querySelector('.created-pack-detail');
+        // Toggle closed if already open
+        if (!detail.classList.contains('hidden')) {
+          detail.classList.add('hidden');
+          btn.textContent = 'View';
+          return;
+        }
+        const code = wrap.dataset.code;
+        btn.disabled = true;
+        btn.textContent = 'Loading\u2026';
+        try {
+          const { loadSharedPack } = await import('./firebase.js');
+          const pack = await loadSharedPack(code);
+          const items = (pack.recipes || []).map(r => {
+            const meta = [
+              r.prep_time ? `Prep: ${escManage(r.prep_time)}` : '',
+              r.cook_time ? `Cook: ${escManage(r.cook_time)}` : '',
+              r.servings ? `Serves: ${escManage(r.servings)}` : '',
+            ].filter(Boolean).join(' \u00b7 ');
+            return `<li><div class="created-pack-recipe-name">${escManage(r.name || '(untitled)')}</div>${meta ? `<div class="section-help" style="margin:0">${meta}</div>` : ''}</li>`;
+          }).join('');
+          detail.innerHTML = items
+            ? `<ul class="created-pack-recipe-list">${items}</ul>`
+            : '<p class="section-help" style="font-style:italic">This pack is empty.</p>';
+          detail.classList.remove('hidden');
+          btn.textContent = 'Hide';
+        } catch (err) {
+          detail.innerHTML = `<p class="section-help" style="color:#a05a00">Could not load pack: ${escManage(err.message || 'unknown error')}</p>`;
+          detail.classList.remove('hidden');
+          btn.textContent = 'View';
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
   }

@@ -918,6 +918,35 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   font-size: 1rem;
   line-height: 1;
 }
+.created-pack-wrap {
+  margin-bottom: 0.4rem;
+}
+.created-pack-wrap .created-pack-row {
+  margin-bottom: 0;
+}
+.created-pack-detail {
+  border: 1px solid var(--border, #ddd);
+  border-top: none;
+  border-radius: 0 0 var(--r-btn, 4px) var(--r-btn, 4px);
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-alt, #fafafa);
+}
+.created-pack-recipe-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.created-pack-recipe-list li {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border, #eee);
+}
+.created-pack-recipe-list li:last-child {
+  border-bottom: none;
+}
+.created-pack-recipe-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
 
 /* Allergen warning in planner */
 .allergen-warning {
