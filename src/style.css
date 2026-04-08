@@ -812,6 +812,61 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   font-style: italic;
 }
 
+/* User-defined tag chip (purple, distinct from green convenience chips) */
+.user-tag-chip {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-pill);
+  background: #efe6f5;
+  color: #5a3a7a;
+  border: 0.8px solid #c9b3dd;
+  white-space: nowrap;
+}
+
+/* Active user-tag pill in the editor — purple variant of the toggle pill */
+.pref-flag-btn.toggle-pill.user-tag-pill.active {
+  background: #efe6f5;
+  color: #5a3a7a;
+  border: 1px solid #9a72c4;
+}
+
+.user-tags-editor {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+.user-tags-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+.user-tags-add {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+.user-tag-input {
+  flex: 1;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border, #ccc);
+  border-radius: var(--r-btn, 4px);
+  min-width: 0;
+}
+.user-tag-add-btn {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  background: #efe6f5;
+  color: #5a3a7a;
+  border: 1px solid #9a72c4;
+  border-radius: var(--r-btn, 4px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.user-tag-add-btn:hover {
+  background: #e3d3ee;
+}
+
 /* Allergen warning in planner */
 .allergen-warning {
   font-size: 0.78rem;

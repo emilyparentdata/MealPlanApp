@@ -423,6 +423,24 @@ export async function saveGroceryExtras(items) {
   await col('settings').doc('groceryExtras').set({ items });
 }
 
+// === User Tag Definitions (household-scoped list of custom tag names) ===
+
+export async function loadUserTagDefinitions() {
+  if (!firebaseEnabled || !householdId) {
+    return JSON.parse(localStorage.getItem('user_tag_definitions') || '[]');
+  }
+  const doc = await col('settings').doc('userTags').get();
+  return doc.exists ? (doc.data().tags || []) : [];
+}
+
+export async function saveUserTagDefinitions(tags) {
+  if (!firebaseEnabled || !householdId) {
+    localStorage.setItem('user_tag_definitions', JSON.stringify(tags));
+    return;
+  }
+  await col('settings').doc('userTags').set({ tags, updated: Date.now() });
+}
+
 // === Repeat Window Setting ===
 
 export async function loadRepeatWindow() {

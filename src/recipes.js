@@ -1,5 +1,6 @@
 import { getArchivedRecipes, getCustomRecipes } from './firebase.js';
 import { isSlowCooker, isInstantPot, getRecipeTotalMinutes } from './convenience.js';
+import { getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag, getRecipeUserTags } from './userTags.js';
 
 let allRecipes = [];
 
@@ -87,7 +88,11 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
     if (instantPotOn) convenienceChips.push(`<span class="time-chip" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</span>`);
     if (isMakeAhead) convenienceChips.push(`<span class="time-chip">Make Ahead</span>`);
 
-    const allChips = allergenChips + dietChips + convenienceChips.join('');
+    // User tag chips (custom user-defined labels) — purple styling
+    const userTagsList = (pref.userTags || []);
+    const userTagChips = userTagsList.map(t => `<span class="user-tag-chip">${esc(t)}</span>`).join('');
+
+    const allChips = allergenChips + dietChips + convenienceChips.join('') + userTagChips;
 
     card.innerHTML = `
       <h3 class="recipe-card-name">${esc(r.name)}</h3>
@@ -107,6 +112,14 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
           <button class="pref-flag-btn toggle-pill make-ahead-btn${isMakeAhead ? ' active' : ''}">Make Ahead</button>
           <button class="pref-flag-btn toggle-pill slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
           <button class="pref-flag-btn toggle-pill instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
+          <div class="user-tags-editor" data-uid="${esc(r.uid)}">
+            <p class="tags-edit-hint" style="margin-top:0.75rem">Your tags:</p>
+            <div class="user-tags-pills"></div>
+            <div class="user-tags-add">
+              <input type="text" class="user-tag-input" placeholder="New tag\u2026" maxlength="40">
+              <button class="user-tag-add-btn" type="button">Add</button>
+            </div>
+          </div>
         </div>
       </details>
       ${onDelete ? '<button class="card-trash-btn" title="Delete recipe">&#128465;</button>' : ''}
@@ -164,7 +177,10 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       if (ip) newChips.push(`<span class="time-chip" title="${ipOver ? 'Manual override' : 'Auto-detected'}">Instant Pot${ipOver ? '' : ' \u2728'}</span>`);
       if (ma) newChips.push(`<span class="time-chip">Make Ahead</span>`);
 
-      const newAllChips = allergenChips + dietChips + newChips.join('');
+      const updatedTags = (updatedPref.userTags || []);
+      const userChipsHtml = updatedTags.map(t => `<span class="user-tag-chip">${esc(t)}</span>`).join('');
+
+      const newAllChips = allergenChips + dietChips + newChips.join('') + userChipsHtml;
       if (chipsContainer) {
         chipsContainer.innerHTML = newAllChips;
       } else if (newAllChips) {
@@ -224,6 +240,64 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
         refreshConvenienceChips();
       }
     });
+
+    // === User tag editor ===
+    const tagEditor = card.querySelector('.user-tags-editor');
+    const pillsEl = tagEditor.querySelector('.user-tags-pills');
+    const tagInput = tagEditor.querySelector('.user-tag-input');
+    const tagAddBtn = tagEditor.querySelector('.user-tag-add-btn');
+
+    function renderTagPills() {
+      const defs = getUserTagDefinitions();
+      const assigned = new Set((preferences[r.uid]?.userTags || []).map(t => t.toLowerCase()));
+      if (!defs.length) {
+        pillsEl.innerHTML = '<span class="tags-edit-hint" style="font-style:italic">No tags yet \u2014 add one below.</span>';
+        return;
+      }
+      pillsEl.innerHTML = defs.map(t => {
+        const active = assigned.has(t.toLowerCase()) ? ' active' : '';
+        return `<button type="button" class="pref-flag-btn toggle-pill user-tag-pill${active}" data-tag="${escAttr(t)}">${esc(t)}</button>`;
+      }).join('');
+      pillsEl.querySelectorAll('.user-tag-pill').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const tag = btn.dataset.tag;
+          const newList = await toggleRecipeUserTag(r.uid, tag);
+          preferences[r.uid] = { ...(preferences[r.uid] || {}), userTags: newList };
+          btn.classList.toggle('active');
+          refreshConvenienceChips();
+        });
+      });
+    }
+
+    async function handleAddTag() {
+      const name = tagInput.value.trim();
+      if (!name) return;
+      const created = await addUserTagDefinition(name);
+      tagInput.value = '';
+      if (created) {
+        // Auto-assign new tag to this recipe so the user sees the result.
+        const newList = await toggleRecipeUserTag(r.uid, name);
+        preferences[r.uid] = { ...(preferences[r.uid] || {}), userTags: newList };
+        refreshConvenienceChips();
+      }
+      renderTagPills();
+    }
+
+    tagAddBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleAddTag();
+    });
+    tagInput.addEventListener('click', (e) => e.stopPropagation());
+    tagInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddTag();
+      }
+    });
+
+    renderTagPills();
 
     // Prevent detail toggles from triggering card click
     card.querySelectorAll('details, summary').forEach(el => {
@@ -296,12 +370,19 @@ function esc(str) {
   return div.innerHTML;
 }
 
+function escAttr(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export function filterRecipes(query) {
   const q = query.toLowerCase().trim();
   if (!q) return allRecipes;
-  return allRecipes.filter(r =>
-    r.name.toLowerCase().includes(q) ||
-    (r.categories || []).some(c => c.toLowerCase().includes(q)) ||
-    (r.ingredients || '').toLowerCase().includes(q)
-  );
+  return allRecipes.filter(r => {
+    if (r.name.toLowerCase().includes(q)) return true;
+    if ((r.categories || []).some(c => c.toLowerCase().includes(q))) return true;
+    if ((r.ingredients || '').toLowerCase().includes(q)) return true;
+    const tags = getRecipeUserTags(r.uid);
+    if (tags.some(t => t.toLowerCase().includes(q))) return true;
+    return false;
+  });
 }

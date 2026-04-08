@@ -1,6 +1,7 @@
 import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs } from './preferences.js';
+import { initUserTags, getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
@@ -60,6 +61,7 @@ async function initApp(household) {
   await loadHouseholdRecipes();
   await loadRecipes();
   await initPreferences();
+  await initUserTags();
 
   // Get members and restrictions from household
   members = await getHouseholdMembers();
