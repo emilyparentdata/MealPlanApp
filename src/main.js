@@ -1,6 +1,6 @@
 import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
-import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs } from './preferences.js';
+import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
 import { initUserTags, getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
@@ -1544,8 +1544,15 @@ function setupSharedPacks() {
     try {
       const allRecipes = getRecipes();
       const selected = allRecipes.filter(r => selectedUids.has(r.uid));
-      const { createSharedPack } = await import('./firebase.js');
+      const { createSharedPack, recordCreatedPack } = await import('./firebase.js');
       const code = await createSharedPack(packName, selected);
+      await recordCreatedPack({
+        code,
+        name: packName,
+        recipeCount: selected.length,
+        createdAt: Date.now(),
+      });
+      renderCreatedPacksList();
 
       createResult.innerHTML = `
         <div class="shared-code-result">
@@ -1575,6 +1582,54 @@ function setupSharedPacks() {
       createBtn.textContent = 'Create Shared Pack';
     }
   });
+
+  // --- Your Packs (history of packs created by this household) ---
+
+  async function renderCreatedPacksList() {
+    const listEl = document.getElementById('created-packs-list');
+    if (!listEl) return;
+    const { loadCreatedPacks } = await import('./firebase.js');
+    const packs = await loadCreatedPacks();
+    if (!packs.length) {
+      listEl.innerHTML = '<p class="section-help" style="font-style:italic">You haven\'t created any packs yet.</p>';
+      return;
+    }
+    listEl.innerHTML = packs.map(p => {
+      const date = new Date(p.createdAt).toLocaleDateString();
+      return `
+        <div class="created-pack-row" data-code="${escAttr(p.code)}">
+          <div class="created-pack-info">
+            <strong>${escManage(p.name)}</strong>
+            <span class="section-help">${p.recipeCount} recipe${p.recipeCount === 1 ? '' : 's'} \u00b7 ${date}</span>
+          </div>
+          <div class="created-pack-actions">
+            <code class="created-pack-code">${escManage(p.code)}</code>
+            <button class="btn created-pack-copy" type="button">Copy</button>
+            <button class="btn created-pack-remove" type="button" title="Remove from list">&times;</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    listEl.querySelectorAll('.created-pack-copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.closest('.created-pack-row').dataset.code;
+        navigator.clipboard.writeText(code);
+        showToast('Code copied!');
+      });
+    });
+    listEl.querySelectorAll('.created-pack-remove').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const code = btn.closest('.created-pack-row').dataset.code;
+        const { removeCreatedPack } = await import('./firebase.js');
+        await removeCreatedPack(code);
+        renderCreatedPacksList();
+      });
+    });
+  }
+
+  // Initial render so the list shows on first navigation to the share tab.
+  renderCreatedPacksList();
 }
 
 // === Photo Scan Import ===
@@ -2384,11 +2439,57 @@ function setupEditModal() {
     };
 
     await saveRecipeToFirebase(updated);
+
+    // Persist user tag assignments. Walk the definitions to recover the
+    // display-cased tag names from the lowercased working set, then merge
+    // into the recipe's preferences doc.
+    const finalUserTags = getUserTagDefinitions().filter(t => editModalUserTags.has(t.toLowerCase()));
+    const currentPrefs = getRecipePrefs(currentEditRecipe.uid);
+    await updateRecipePrefs(currentEditRecipe.uid, { ...currentPrefs, userTags: finalUserTags });
+
     await loadHouseholdRecipes();
     await loadRecipes();
     closeEditModal();
     refreshManageRecipeList();
     showToast(`"${name}" updated.`);
+  });
+
+  // "Add Tag" button — creates a new tag definition and toggles it on
+  // for this recipe (will be persisted on Save Changes).
+  document.getElementById('edit-recipe-add-tag-btn').addEventListener('click', async () => {
+    const input = document.getElementById('edit-recipe-new-tag');
+    const name = input.value.trim();
+    if (!name) return;
+    await addUserTagDefinition(name);
+    editModalUserTags.add(name.toLowerCase());
+    input.value = '';
+    // Re-render the pill list, but preserve the working set we just added to.
+    const container = document.getElementById('edit-recipe-user-tags');
+    const defs = getUserTagDefinitions();
+    container.innerHTML = defs.map(t => {
+      const active = editModalUserTags.has(t.toLowerCase()) ? ' active' : '';
+      return `<button type="button" class="allergen-toggle${active}" data-user-tag="${escAttr(t)}">${escManage(t)}</button>`;
+    }).join('');
+    container.querySelectorAll('.allergen-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tag = btn.dataset.userTag;
+        const key = tag.toLowerCase();
+        if (editModalUserTags.has(key)) {
+          editModalUserTags.delete(key);
+          btn.classList.remove('active');
+        } else {
+          editModalUserTags.add(key);
+          btn.classList.add('active');
+        }
+      });
+    });
+  });
+  document.getElementById('edit-recipe-new-tag').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('edit-recipe-add-tag-btn').click();
+    }
   });
 
   // Delete from edit modal
@@ -2568,7 +2669,45 @@ function openEditModal(recipe) {
     btn.addEventListener('click', (e) => { e.preventDefault(); btn.classList.toggle('active'); });
   });
 
+  // User tag toggles (custom user-defined labels)
+  renderEditModalUserTags(recipe.uid);
+
   document.getElementById('edit-recipe-modal').classList.remove('hidden');
+}
+
+// Editor working state — tracks which user tags are toggled on while the
+// edit modal is open, so the Save button can persist them in one go.
+let editModalUserTags = new Set();
+
+function renderEditModalUserTags(recipeUid) {
+  const container = document.getElementById('edit-recipe-user-tags');
+  // Seed working state from the recipe's current assignments (lower-cased keys).
+  const assigned = (getRecipePrefs(recipeUid).userTags || []).map(t => t.toLowerCase());
+  editModalUserTags = new Set(assigned);
+
+  const defs = getUserTagDefinitions();
+  if (!defs.length) {
+    container.innerHTML = '<span class="tags-edit-hint" style="font-style:italic">No tags yet \u2014 add one below.</span>';
+    return;
+  }
+  container.innerHTML = defs.map(t => {
+    const active = editModalUserTags.has(t.toLowerCase()) ? ' active' : '';
+    return `<button type="button" class="allergen-toggle${active}" data-user-tag="${escAttr(t)}">${escManage(t)}</button>`;
+  }).join('');
+  container.querySelectorAll('.allergen-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tag = btn.dataset.userTag;
+      const key = tag.toLowerCase();
+      if (editModalUserTags.has(key)) {
+        editModalUserTags.delete(key);
+        btn.classList.remove('active');
+      } else {
+        editModalUserTags.add(key);
+        btn.classList.add('active');
+      }
+    });
+  });
 }
 
 function closeEditModal() {

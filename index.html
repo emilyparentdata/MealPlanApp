@@ -359,6 +359,14 @@
             </div>
             <div id="shared-create-result" class="hidden"></div>
           </div>
+
+          <hr style="margin:1.5rem 0;border-color:var(--border)">
+
+          <div class="shared-section">
+            <h4>Your Packs</h4>
+            <p class="section-help">Packs you've created. Re-copy a code to share it again.</p>
+            <div id="created-packs-list"></div>
+          </div>
         </div>
 
         <!-- Tab: Starters -->
@@ -458,6 +466,12 @@
         <div id="edit-recipe-allergens" class="allergen-toggles"></div>
         <label>Dietary Category</label>
         <div id="edit-recipe-diet" class="allergen-toggles"></div>
+        <label>Your Tags</label>
+        <div id="edit-recipe-user-tags" class="allergen-toggles"></div>
+        <div class="edit-user-tags-add">
+          <input type="text" id="edit-recipe-new-tag" placeholder="New tag&hellip;" maxlength="40">
+          <button type="button" id="edit-recipe-add-tag-btn" class="btn">Add Tag</button>
+        </div>
         <label>Source / URL</label>
         <input type="text" id="edit-recipe-source">
         <label>Notes</label>

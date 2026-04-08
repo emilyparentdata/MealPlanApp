@@ -509,6 +509,39 @@ export async function createSharedPack(name, recipes) {
   return code;
 }
 
+// === Created Shared Packs (history of packs this household has shared) ===
+
+export async function loadCreatedPacks() {
+  if (!firebaseEnabled || !householdId) {
+    return JSON.parse(localStorage.getItem('created_packs') || '[]');
+  }
+  const doc = await col('settings').doc('createdPacks').get();
+  return doc.exists ? (doc.data().packs || []) : [];
+}
+
+export async function recordCreatedPack(entry) {
+  // entry: { code, name, recipeCount, createdAt }
+  const existing = await loadCreatedPacks();
+  // Drop any prior entry with the same code (re-shares overwrite)
+  const next = existing.filter(p => p.code !== entry.code);
+  next.unshift(entry);
+  if (!firebaseEnabled || !householdId) {
+    localStorage.setItem('created_packs', JSON.stringify(next));
+    return;
+  }
+  await col('settings').doc('createdPacks').set({ packs: next, updated: Date.now() });
+}
+
+export async function removeCreatedPack(code) {
+  const existing = await loadCreatedPacks();
+  const next = existing.filter(p => p.code !== code);
+  if (!firebaseEnabled || !householdId) {
+    localStorage.setItem('created_packs', JSON.stringify(next));
+    return;
+  }
+  await col('settings').doc('createdPacks').set({ packs: next, updated: Date.now() });
+}
+
 export async function loadSharedPack(code) {
   if (!firebaseEnabled) throw new Error('Firebase required for sharing');
 
