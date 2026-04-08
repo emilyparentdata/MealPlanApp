@@ -931,6 +931,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   padding: 0.5rem 0.75rem;
   background: var(--surface-alt, #fafafa);
 }
+.created-pack-detail.hidden { display: none; }
 .created-pack-recipe-list {
   list-style: none;
   padding: 0;
