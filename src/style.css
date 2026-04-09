@@ -604,16 +604,25 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   position: relative;
 }
 .modal-close {
-  position: absolute;
-  top: 0.75rem;
-  right: 1rem;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
+  position: sticky;
+  top: 0;
+  float: right;
+  z-index: 10;
+  background: var(--card);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.3rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   color: var(--text-light);
+  margin-bottom: -2rem; /* prevent it pushing content down */
 }
-.modal-close:hover { color: var(--text); }
+.modal-close:hover { color: var(--text); background: var(--surface-alt, #f0f0f0); }
 
 /* Household settings modal */
 .household-settings-body {
@@ -2905,16 +2914,16 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     height: 100%;
     border-radius: 0;
     padding: 1.25rem 1rem;
+    padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
   }
   .modal-close {
-    top: 0.5rem;
-    right: 0.75rem;
-    font-size: 1.75rem;
+    top: 0;
+    font-size: 1.5rem;
     min-width: 44px;
     min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: -44px;
   }
 
   /* -- Add recipe tabs: compact grid on mobile -- */
