@@ -60,6 +60,10 @@ export function onAuthStateChanged(callback) {
 
 export async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    return auth.signInWithRedirect(provider);
+  }
   return auth.signInWithPopup(provider);
 }
 
