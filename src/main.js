@@ -6,6 +6,7 @@ import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWe
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
 import { getConvenienceLabel, getRecipeTotalMinutes, isSlowCooker, isInstantPot } from './convenience.js';
+import { initTimerWidget } from './timer.js';
 
 // === State ===
 const BETA_CODE = 'MEALS2026';
@@ -84,6 +85,7 @@ async function initApp(household) {
   setupSignOut();
   setupEditModal();
   setupHouseholdSettings();
+  initTimerWidget();
 
   // Show household name + invite code in header
   if (household) {

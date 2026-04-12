@@ -1,6 +1,7 @@
 import { getArchivedRecipes, getCustomRecipes } from './firebase.js';
 import { isSlowCooker, isInstantPot, getRecipeTotalMinutes } from './convenience.js';
 import { getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag, getRecipeUserTags } from './userTags.js';
+import { linkifyTimeReferences } from './timer.js';
 
 let allRecipes = [];
 
@@ -342,7 +343,7 @@ export function renderRecipeDetail(container, recipe) {
     sections.push(`<div class="detail-section"><h4>Ingredients</h4><pre>${esc(recipe.ingredients)}</pre></div>`);
   }
   if (recipe.directions) {
-    sections.push(`<div class="detail-section"><h4>Directions</h4><pre>${esc(recipe.directions)}</pre></div>`);
+    sections.push(`<div class="detail-section"><h4>Directions</h4><pre>${linkifyTimeReferences(esc(recipe.directions))}</pre></div>`);
   }
   if (recipe.notes) {
     sections.push(`<div class="detail-section"><h4>Notes</h4><pre>${esc(recipe.notes)}</pre></div>`);
