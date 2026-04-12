@@ -1,8 +1,8 @@
-import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions } from './firebase.js';
+import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
 import { initUserTags, getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
-import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, DAYS, getCurrentWeekStart } from './planner.js';
+import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, getDAYS, getCurrentWeekStart, resetWeekStart, getWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
 import { getConvenienceLabel, getRecipeTotalMinutes, isSlowCooker, isInstantPot } from './convenience.js';
@@ -31,11 +31,17 @@ async function init() {
     }
 
     // User is signed in — check if they have a household
-    const household = await loadUserHousehold();
-    if (household) {
-      await showApp(user, household);
-    } else {
-      document.getElementById('household-setup').classList.remove('hidden');
+    try {
+      const household = await loadUserHousehold();
+      if (household) {
+        await showApp(user, household);
+      } else {
+        document.getElementById('household-setup').classList.remove('hidden');
+      }
+    } catch (e) {
+      console.error('Failed to load app:', e);
+      document.getElementById('login-screen').classList.remove('hidden');
+      showLoginError('Something went wrong loading your data. Please try signing in again.');
     }
   });
 }
@@ -58,6 +64,8 @@ async function showApp(user, household) {
 
 async function initApp(household) {
   // Load household-scoped data from Firestore
+  await loadWeekStartDay();
+  resetWeekStart(); // recalculate now that we know the start day
   await loadHouseholdRecipes();
   await loadRecipes();
   await initPreferences();
@@ -246,6 +254,8 @@ function setupHouseholdPage() {
     }
     try {
       const { inviteCode } = await createHousehold(name, memberNames);
+      const weekDay = Number(document.getElementById('setup-week-start').value);
+      await saveWeekStartDay(weekDay);
       showToast(`Household created! Invite code: ${inviteCode}`);
       const household = await getHouseholdInfo();
       const user = (await import('./firebase.js')).getCurrentUser();
@@ -296,10 +306,22 @@ function setupHouseholdSettings() {
   const restrictionsList = document.getElementById('household-restrictions-list');
   const newInput = document.getElementById('new-member-input');
 
+  const weekStartSelect = document.getElementById('week-start-day-select');
+
   document.getElementById('household-settings-btn').addEventListener('click', () => {
     renderMemberList();
     renderRestrictions();
+    weekStartSelect.value = String(getWeekStartDay());
     modal.classList.remove('hidden');
+  });
+
+  weekStartSelect.addEventListener('change', async () => {
+    const newDay = Number(weekStartSelect.value);
+    await saveWeekStartDay(newDay);
+    resetWeekStart();
+    showPage(currentPage || 'plan-view');
+    const dayName = weekStartSelect.options[weekStartSelect.selectedIndex].text;
+    showToast(`Week now starts on ${dayName}`);
   });
 
   document.querySelector('.household-settings-close').addEventListener('click', () => {
@@ -408,7 +430,9 @@ function setupNavigation() {
   });
 }
 
+let currentPage = 'plan-view';
 function showPage(pageId) {
+  currentPage = pageId;
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
     p.classList.add('hidden');
@@ -496,12 +520,8 @@ function setupPlannerPage() {
     showToast('Plan committed!');
     // Navigate to This Week, synced to the committed week
     const committedStart = new Date(weekKey + 'T00:00:00');
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const currentMonday = new Date(now.getFullYear(), now.getMonth(), diff);
-    currentMonday.setHours(0, 0, 0, 0);
-    viewWeekOffset = Math.round((committedStart - currentMonday) / (7 * 24 * 60 * 60 * 1000));
+    const thisWeekStart = getWeekStart(new Date());
+    viewWeekOffset = Math.round((committedStart - thisWeekStart) / (7 * 24 * 60 * 60 * 1000));
     showPage('plan-view');
   });
 }
@@ -543,11 +563,8 @@ function refreshPlanner() {
 let viewWeekOffset = 0;
 
 function getViewWeekStart() {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff + viewWeekOffset * 7);
-  d.setHours(0, 0, 0, 0);
+  const d = getWeekStart(new Date());
+  d.setDate(d.getDate() + viewWeekOffset * 7);
   return d;
 }
 
@@ -2604,7 +2621,7 @@ async function showDayPicker(recipe, anchorEl, onDone) {
 
     // Day buttons
     for (let i = 0; i < 7; i++) {
-      const dayName = DAYS[i];
+      const dayName = getDAYS()[i];
       const dayDate = new Date(pickerWeekStart);
       dayDate.setDate(dayDate.getDate() + i);
       const shortDate = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

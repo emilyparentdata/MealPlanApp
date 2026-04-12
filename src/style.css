@@ -176,6 +176,14 @@ body {
   width: 100%;
   margin-bottom: 0.75rem;
 }
+.setup-week-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 0.75rem;
+}
 
 /* Starter Packs */
 .starter-packs {
@@ -681,6 +689,15 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   border: none;
   border-top: 0.8px solid var(--border);
   margin: 1.25rem 0;
+}
+.week-start-select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  background: var(--card);
+  color: var(--text);
 }
 .restriction-block {
   margin-bottom: 0.75rem;

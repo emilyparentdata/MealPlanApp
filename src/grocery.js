@@ -1,8 +1,6 @@
 import { loadCommittedPlan, loadGroceryExtras, saveGroceryExtras } from './firebase.js';
 import { getRecipeByUid } from './recipes.js';
-import { getWeekKey, getWeekLabel } from './planner.js';
-
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+import { getWeekKey, getWeekLabel, getDAYS } from './planner.js';
 
 let lastMeals = null;
 let currentWeekKey = null;
@@ -28,7 +26,7 @@ export async function renderGroceryList(checklistContainer, breakdownContainer, 
 
   // Collect meals for each day
   const meals = [];
-  for (const day of DAYS) {
+  for (const day of getDAYS()) {
     const dayData = plan.days[day];
     if (!dayData) continue;
     if (dayData.skip === true || dayData.skip === 'skip') {

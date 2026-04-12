@@ -1,25 +1,39 @@
 import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
-import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, getRestrictions } from './firebase.js';
+import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, getRestrictions, getWeekStartDay } from './firebase.js';
 import { CONVENIENCE_OPTIONS, getConvenienceLabel, recipeMatchesConvenience } from './convenience.js';
 import { getUserTagDefinitions, recipeMatchesUserTag } from './userTags.js';
 
-export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const ALL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-let currentWeekStart = getMonday(new Date());
+export function getDAYS() {
+  const start = getWeekStartDay(); // 0=Sun, 1=Mon, 6=Sat
+  const ordered = [];
+  for (let i = 0; i < 7; i++) {
+    ordered.push(ALL_DAYS[(start + i) % 7]);
+  }
+  return ordered;
+}
+
+
+let currentWeekStart = getWeekStart(new Date());
 
 export function getCurrentWeekStart() {
   return currentWeekStart;
 }
 
 export function setWeek(date) {
-  currentWeekStart = getMonday(date);
+  currentWeekStart = getWeekStart(date);
 }
 
 export function shiftWeek(delta) {
   const d = new Date(currentWeekStart);
   d.setDate(d.getDate() + delta * 7);
   currentWeekStart = d;
+}
+
+export function resetWeekStart() {
+  currentWeekStart = getWeekStart(new Date());
 }
 
 export function getWeekKey(date) {
@@ -34,11 +48,12 @@ export function getWeekLabel(date) {
   return `${formatDate(d)} - ${formatDate(end)}`;
 }
 
-function getMonday(d) {
+export function getWeekStart(d) {
   const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  date.setDate(diff);
+  const startDay = getWeekStartDay(); // 0=Sun, 1=Mon, 6=Sat
+  const current = date.getDay();
+  const diff = (current - startDay + 7) % 7;
+  date.setDate(date.getDate() - diff);
   date.setHours(0, 0, 0, 0);
   return date;
 }
@@ -82,7 +97,7 @@ async function getRecentRecipeUids(weeksBack) {
     const key = getWeekKey(d);
     const plan = await loadPlan(key);
     if (plan?.days) {
-      for (const day of DAYS) {
+      for (const day of ALL_DAYS) {
         if (plan.days[day]?.recipeUid) uids.add(plan.days[day].recipeUid);
       }
     }
@@ -150,7 +165,7 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
   for (let i = 0; i < 7; i++) {
     const dayDate = new Date(currentWeekStart);
     dayDate.setDate(dayDate.getDate() + i);
-    const dayName = DAYS[i];
+    const dayName = getDAYS()[i];
     const dayData = plan.days[dayName] || {};
 
     const whoHome = dayData.whoHome || [...plannerMembers];
@@ -462,7 +477,7 @@ async function saveDayData(weekKey, dayName, dayEl, members, plan) {
 
 function collectAssignedThisWeek(plan, excludeDay) {
   const uids = new Set();
-  for (const d of DAYS) {
+  for (const d of getDAYS()) {
     if (d === excludeDay) continue;
     if (plan.days[d]?.recipeUid) uids.add(plan.days[d].recipeUid);
   }
@@ -472,7 +487,7 @@ function collectAssignedThisWeek(plan, excludeDay) {
 function collectAssignedProteins(plan, excludeDay) {
   const proteins = [];
   const recipes = getRecipes();
-  for (const d of DAYS) {
+  for (const d of getDAYS()) {
     if (d === excludeDay) continue;
     const uid = plan.days[d]?.recipeUid;
     if (uid) {
@@ -585,7 +600,7 @@ export async function suggestAllMeals(container, members) {
   // Process days sequentially so each day's pick informs the next
   for (let i = 0; i < dayEls.length; i++) {
     const dayEl = dayEls[i];
-    const dayName = DAYS[i];
+    const dayName = getDAYS()[i];
     const currentMeal = dayEl.querySelector('.meal-combo')?.dataset.recipeUid;
     const isSkip = dayEl.querySelector('.day-status-select')?.value;
 

@@ -1,16 +1,11 @@
 import { loadCommittedPlan } from './firebase.js';
 import { getRecipeByUid } from './recipes.js';
-import { getWeekKey, getWeekLabel } from './planner.js';
+import { getWeekKey, getWeekLabel, getDAYS, getWeekStart } from './planner.js';
 import { getConvenienceLabel } from './convenience.js';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
 function isCurrentWeek(weekKey) {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(now.getFullYear(), now.getMonth(), diff);
-  return weekKey === monday.toISOString().slice(0, 10);
+  const start = getWeekStart(new Date());
+  return weekKey === start.toISOString().slice(0, 10);
 }
 
 function isPastWeek(weekKey) {
@@ -57,12 +52,12 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
     return;
   }
 
-  const monday = new Date(weekKey + 'T00:00:00');
+  const weekStart = new Date(weekKey + 'T00:00:00');
 
   for (let i = 0; i < 7; i++) {
-    const dayDate = new Date(monday);
+    const dayDate = new Date(weekStart);
     dayDate.setDate(dayDate.getDate() + i);
-    const dayName = DAYS[i];
+    const dayName = getDAYS()[i];
     const dayData = plan.days[dayName] || {};
 
     const card = document.createElement('div');

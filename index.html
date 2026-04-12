@@ -46,6 +46,17 @@
         <h3>Create a Household</h3>
         <input type="text" id="household-name" placeholder="Household name (e.g. The Smiths)">
         <input type="text" id="household-members" placeholder="Family members (comma separated)">
+        <label class="setup-week-label">Week starts on
+          <select id="setup-week-start" class="week-start-select">
+            <option value="0">Sunday</option>
+            <option value="1" selected>Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+          </select>
+        </label>
         <button id="create-household-btn" class="btn primary login-btn">Create Household</button>
       </div>
 
@@ -423,6 +434,20 @@
           <input type="text" id="new-member-input" placeholder="Add a new member...">
           <button id="add-member-btn" class="btn primary">Add</button>
         </div>
+
+        <hr class="settings-divider">
+
+        <label class="settings-label">Week Starts On</label>
+        <p class="settings-hint">Choose which day your meal-planning week begins.</p>
+        <select id="week-start-day-select" class="week-start-select">
+          <option value="0">Sunday</option>
+          <option value="1">Monday</option>
+          <option value="2">Tuesday</option>
+          <option value="3">Wednesday</option>
+          <option value="4">Thursday</option>
+          <option value="5">Friday</option>
+          <option value="6">Saturday</option>
+        </select>
 
         <hr class="settings-divider">
 

@@ -233,6 +233,36 @@ export async function saveRestrictions(restrictions) {
   await db.collection('households').doc(householdId).update({ restrictions });
 }
 
+// === Week Start Day (household setting, 0=Sun 1=Mon 6=Sat) ===
+
+let _cachedWeekStartDay = 1; // default Monday
+
+export async function loadWeekStartDay() {
+  if (!householdId || !firebaseEnabled) {
+    const saved = localStorage.getItem("week_start_day");
+    _cachedWeekStartDay = saved != null ? Number(saved) : 1;
+    return _cachedWeekStartDay;
+  }
+  const doc = await db.collection('households').doc(householdId).get();
+  if (doc.exists && doc.data().weekStartDay != null) {
+    _cachedWeekStartDay = doc.data().weekStartDay;
+  }
+  return _cachedWeekStartDay;
+}
+
+export function getWeekStartDay() {
+  return _cachedWeekStartDay;
+}
+
+export async function saveWeekStartDay(day) {
+  _cachedWeekStartDay = day;
+  if (!householdId || !firebaseEnabled) {
+    localStorage.setItem("week_start_day", String(day));
+    return;
+  }
+  await db.collection('households').doc(householdId).update({ weekStartDay: day });
+}
+
 // === Preferences (per recipe, not per member) ===
 
 export async function saveRecipePrefs(recipeUid, prefs) {

@@ -1,8 +1,7 @@
 import { loadCommittedPlan, archiveRecipe, getMembers } from './firebase.js';
 import { getRecipeByUid, loadRecipes } from './recipes.js';
 import { getRecipePrefs, toggleDoesntEat, toggleFavorite } from './preferences.js';
-
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+import { getDAYS } from './planner.js';
 
 function confirmDelete(recipeName) {
   return new Promise(resolve => {
@@ -101,7 +100,7 @@ export async function renderFeedbackPage(container) {
 
 function collectMeals(plan) {
   const meals = [];
-  for (const day of DAYS) {
+  for (const day of getDAYS()) {
     const dayData = plan.days[day];
     if (!dayData?.recipeUid) continue;
     if (dayData.skip) continue;
