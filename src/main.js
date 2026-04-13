@@ -1011,6 +1011,14 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
     return chips.join('');
   }
 
+  // User tags section
+  const tagDefs = getUserTagDefinitions();
+  const assignedTags = new Set((prefs.userTags || []).map(t => t.toLowerCase()));
+  const userTagPills = tagDefs.map(t => {
+    const active = assignedTags.has(t.toLowerCase()) ? ' active' : '';
+    return `<button class="pref-flag-btn toggle-pill user-tag-pill${active}" data-tag="${escAttr(t)}">${escManage(t)}</button>`;
+  }).join('');
+
   el.innerHTML = `
     <div class="pref-row-inline pref-top-actions">${topButtons}</div>
     <div class="pref-row-inline">
@@ -1024,6 +1032,10 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
       <button class="pref-flag-btn toggle-pill slow-cooker-btn${slowCookerOn ? ' active' : ''}" title="${slowCookerOverridden ? 'Manual override' : 'Auto-detected'}">Slow Cooker${slowCookerOverridden ? '' : ' \u2728'}</button>
       <button class="pref-flag-btn toggle-pill instant-pot-btn${instantPotOn ? ' active' : ''}" title="${instantPotOverridden ? 'Manual override' : 'Auto-detected'}">Instant Pot${instantPotOverridden ? '' : ' \u2728'}</button>
     </div>
+    ${tagDefs.length ? `<div class="pref-row-inline pref-method-row">
+      <span class="pref-label">Your tags:</span>
+      ${userTagPills}
+    </div>` : ''}
   `;
 
   function refreshChipStrip() {
@@ -1093,6 +1105,16 @@ function buildInlinePreferenceControls(recipeUid, { onUpdate, onEdit, onDelete }
       if (onUpdate) onUpdate();
     });
   }
+
+  // Wire user tag pills
+  el.querySelectorAll('.user-tag-pill').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await toggleRecipeUserTag(recipeUid, btn.dataset.tag);
+      btn.classList.toggle('active');
+      if (onUpdate) onUpdate();
+    });
+  });
 
   return el;
 }

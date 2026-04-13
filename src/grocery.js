@@ -69,11 +69,14 @@ function renderChecklist(container, meals) {
   const deletesKey = `grocery_deletes_${currentWeekKey}`;
   const deletes = JSON.parse(localStorage.getItem(deletesKey) || '{}');
 
+  const CATEGORY_KEYS = { 'Produce': 'produce', 'Meat & Seafood': 'meat', 'Dairy & Eggs': 'dairy', 'Pantry': 'pantry', 'Spices & Seasonings': 'spices', 'Other': 'other' };
+
   let html = '';
   for (const [category, items] of groups) {
     const visibleItems = items.filter(item => !deletes[item.key]);
     if (!visibleItems.length) continue;
-    html += `<div class="grocery-category">`;
+    const catKey = CATEGORY_KEYS[category] || 'other';
+    html += `<div class="grocery-category" data-category="${catKey}">`;
     if (category) {
       html += `<h3 class="grocery-category-label">${escHtml(category)}</h3>`;
     }
@@ -84,7 +87,7 @@ function renderChecklist(container, meals) {
       const isChecked = checked[key] ? 'checked' : '';
       const checkedClass = checked[key] ? ' checked' : '';
       const mealNote = `<span class="grocery-meal-note">${item.meals.map(escHtml).join(', ')}</span>`;
-      html += `<li>
+      html += `<li draggable="true" data-ingredient-key="${escAttr(key)}">
         <label class="grocery-check${checkedClass}">
           <input type="checkbox" data-key="${escAttr(key)}" ${isChecked}>
           <span class="grocery-item-text">${escHtml(displayText)}</span>
@@ -162,6 +165,115 @@ function renderChecklist(container, meals) {
   });
 
   updateProgress(container);
+
+  // === Drag-and-drop between categories ===
+  setupGroceryDrag(container, meals);
+}
+
+function setupGroceryDrag(container, meals) {
+  const categories = container.querySelectorAll('.grocery-category');
+  const items = container.querySelectorAll('li[draggable]');
+  let dragKey = null;
+
+  // --- HTML5 drag (desktop) ---
+  items.forEach(li => {
+    li.addEventListener('dragstart', (e) => {
+      dragKey = li.dataset.ingredientKey;
+      li.classList.add('grocery-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragKey);
+    });
+    li.addEventListener('dragend', () => {
+      li.classList.remove('grocery-dragging');
+      categories.forEach(c => c.classList.remove('grocery-drag-over'));
+      dragKey = null;
+    });
+  });
+
+  categories.forEach(cat => {
+    cat.addEventListener('dragover', (e) => {
+      if (!dragKey) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      cat.classList.add('grocery-drag-over');
+    });
+    cat.addEventListener('dragleave', () => {
+      cat.classList.remove('grocery-drag-over');
+    });
+    cat.addEventListener('drop', (e) => {
+      e.preventDefault();
+      cat.classList.remove('grocery-drag-over');
+      const key = e.dataTransfer.getData('text/plain');
+      const targetCategory = cat.dataset.category;
+      if (!key || !targetCategory) return;
+      saveCategoryOverride(key, targetCategory);
+      renderChecklist(container, meals);
+    });
+  });
+
+  // --- Touch drag (mobile) ---
+  let touchKey = null;
+  let touchActive = false;
+  let ghost = null;
+  let startX = 0, startY = 0;
+
+  items.forEach(li => {
+    li.addEventListener('touchstart', (e) => {
+      touchKey = li.dataset.ingredientKey;
+      touchActive = false;
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+    }, { passive: true });
+
+    li.addEventListener('touchmove', (e) => {
+      if (!touchKey || touchKey !== li.dataset.ingredientKey) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - startX);
+      const dy = Math.abs(touch.clientY - startY);
+
+      if (!touchActive && (dx > 10 || dy > 10)) {
+        touchActive = true;
+        li.classList.add('grocery-dragging');
+        ghost = document.createElement('div');
+        ghost.className = 'drag-ghost';
+        const text = li.querySelector('.grocery-item-text');
+        ghost.textContent = text ? text.textContent.slice(0, 30) : 'Item';
+        document.body.appendChild(ghost);
+      }
+
+      if (touchActive) {
+        e.preventDefault();
+        ghost.style.left = (touch.clientX - 50) + 'px';
+        ghost.style.top = (touch.clientY - 16) + 'px';
+
+        categories.forEach(c => {
+          c.classList.remove('grocery-drag-over');
+          const rect = c.getBoundingClientRect();
+          if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+              touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+            c.classList.add('grocery-drag-over');
+          }
+        });
+      }
+    }, { passive: false });
+
+    li.addEventListener('touchend', () => {
+      if (!touchActive) { touchKey = null; return; }
+      li.classList.remove('grocery-dragging');
+      if (ghost) { ghost.remove(); ghost = null; }
+
+      const target = container.querySelector('.grocery-category.grocery-drag-over');
+      categories.forEach(c => c.classList.remove('grocery-drag-over'));
+
+      if (target && touchKey) {
+        saveCategoryOverride(touchKey, target.dataset.category);
+        renderChecklist(container, meals);
+      }
+      touchActive = false;
+      touchKey = null;
+    });
+  });
 }
 
 function updateProgress(container) {
@@ -430,11 +542,13 @@ function aggregateIngredients(meals) {
   const pantry = [];
   const spices = [];
   const other = [];
+  const overrides = getCategoryOverrides();
 
   for (const [, entry] of ingredientMap) {
-    // If the unit is "can" or "jar", it's a pantry item regardless of ingredient name
+    // Check for user override first, then auto-categorize
+    const overrideSection = overrides[entry.key];
     const hasShelfUnit = entry.quantities.some(q => /^(can|jar|bottle|bag|package|packet|box)$/.test(q.unit));
-    const section = hasShelfUnit ? 'pantry' : categorizeIngredient(entry.name);
+    const section = overrideSection || (hasShelfUnit ? 'pantry' : categorizeIngredient(entry.name));
     const suppressQty = section === 'pantry' || section === 'spices' || isStapleDairy(entry.name);
     const display = buildDisplayText(entry, suppressQty);
     const item = { display, meals: entry.meals, key: entry.key, name: entry.name };
@@ -640,6 +754,19 @@ function categorizeIngredient(ing) {
     if (lower.includes(word)) return 'pantry';
   }
   return 'other';
+}
+
+// === Category overrides (persist across weeks) ===
+const CATEGORY_OVERRIDES_KEY = 'grocery_category_overrides';
+
+function getCategoryOverrides() {
+  return JSON.parse(localStorage.getItem(CATEGORY_OVERRIDES_KEY) || '{}');
+}
+
+function saveCategoryOverride(ingredientKey, category) {
+  const overrides = getCategoryOverrides();
+  overrides[ingredientKey] = category;
+  localStorage.setItem(CATEGORY_OVERRIDES_KEY, JSON.stringify(overrides));
 }
 
 // === Text output for copy/share ===
