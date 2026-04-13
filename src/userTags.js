@@ -89,8 +89,11 @@ export function recipeHasUserTag(recipeUid, tagName) {
 }
 
 // Filter helper used by the planner suggestion logic.
-export function recipeMatchesUserTag(recipePref, tagName) {
+// Checks user tags on preferences AND dietCategories on the recipe object.
+export function recipeMatchesUserTag(recipePref, tagName, recipe) {
   if (!tagName) return true;
   const norm = normalize(tagName);
-  return (recipePref?.userTags || []).some(t => normalize(t) === norm);
+  if ((recipePref?.userTags || []).some(t => normalize(t) === norm)) return true;
+  if (recipe && (recipe.dietCategories || []).some(t => normalize(t) === norm)) return true;
+  return false;
 }

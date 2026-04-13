@@ -5,6 +5,7 @@ import { CONVENIENCE_OPTIONS, getConvenienceLabel, recipeMatchesConvenience } fr
 import { getUserTagDefinitions, recipeMatchesUserTag } from './userTags.js';
 
 const ALL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DIET_TAGS = ['Vegetarian', 'Vegan'];
 
 export function getDAYS() {
   const start = getWeekStartDay(); // 0=Sun, 1=Mon, 6=Sat
@@ -129,7 +130,7 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
     // Back-compat: old plans had a boolean makeAhead. Migrate to convenience.
     const convenience = dayData.convenience || (dayData.makeAhead ? 'make-ahead' : '');
     const userTagFilter = dayData.userTag || '';
-    const tagDefinitions = getUserTagDefinitions();
+    const tagDefinitions = [...getUserTagDefinitions(), ...DIET_TAGS.filter(d => !getUserTagDefinitions().some(t => t.toLowerCase() === d.toLowerCase()))];
 
     const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
     const selectedRecipe = dayData.recipeUid ? recipes.find(r => r.uid === dayData.recipeUid) : null;
@@ -626,8 +627,8 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
       continue;
     }
 
-    // User tag filter (custom labels like BLW, kid favorite, etc.)
-    if (dayData.userTag && !recipeMatchesUserTag(recipePref, dayData.userTag)) {
+    // User tag filter (custom labels like BLW, kid favorite, etc. + diet categories)
+    if (dayData.userTag && !recipeMatchesUserTag(recipePref, dayData.userTag, recipe)) {
       filteredByUserTag++;
       continue;
     }
