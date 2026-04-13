@@ -2635,58 +2635,85 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   line-height: 1.5;
 }
 
-.planner-setting {
+/* === Planning Preferences Card === */
+.planner-prefs-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.planner-prefs-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-  color: var(--text-light);
-}
-.planner-setting select {
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  font-size: 0.9rem;
-}
-
-/* === Snooze Tags === */
-.snooze-section {
-  margin-bottom: 1rem;
-}
-.snooze-toggle {
-  background: none;
-  border: none;
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  color: var(--text-light);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0;
+  font-family: var(--font-sans);
+  text-align: left;
 }
-.snooze-toggle .toggle-arrow {
+.planner-prefs-title {
+  font-family: var(--font-nav);
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.planner-prefs-summary {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.planner-prefs-toggle .toggle-arrow {
   font-size: 0.6rem;
   transition: transform 0.2s;
   display: inline-block;
+  color: var(--text-faint);
 }
-.snooze-toggle.open .toggle-arrow {
+.planner-prefs-toggle.open .toggle-arrow {
   transform: rotate(90deg);
 }
-.snooze-count {
-  font-size: 0.8rem;
-  color: var(--text-faint);
+.planner-prefs-body {
+  padding: 0 1rem 1rem;
 }
-.snooze-body {
+.planner-prefs-body.hidden { display: none; }
+.prefs-section {
   padding: 0.5rem 0;
 }
-.snooze-body.hidden { display: none; }
-.snooze-body .section-help {
-  font-size: 0.8rem;
+.prefs-section-label {
+  font-family: var(--font-nav);
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--text);
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.prefs-hint {
+  font-size: 0.78rem;
   color: var(--text-faint);
   margin-bottom: 0.5rem;
+  line-height: 1.4;
 }
+.prefs-divider {
+  border: none;
+  border-top: 0.8px solid var(--border);
+  margin: 0.25rem 0;
+}
+.prefs-section select {
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+}
+
+/* Snooze chips */
 #snooze-chips {
   display: flex;
   flex-wrap: wrap;

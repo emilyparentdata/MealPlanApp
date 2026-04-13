@@ -117,51 +117,7 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
 
   container.innerHTML = '';
 
-  // Use-up items panel
-  const useUpEl = document.createElement('div');
-  useUpEl.className = 'use-up-panel';
-  useUpEl.innerHTML = `
-    <div class="use-up-header">
-      <strong>Use up this week</strong>
-      <span class="use-up-hint">Ingredients you already have — meals using these get priority</span>
-    </div>
-    <div class="use-up-tags">${useUpItems.map(item => `<span class="use-up-tag">${escHtml(item)}<button class="use-up-remove" data-item="${escAttr(item)}">&times;</button></span>`).join('')}</div>
-    <div class="use-up-add">
-      <input type="text" class="use-up-input" placeholder="e.g. ricotta, leftover chicken...">
-      <button class="btn use-up-add-btn">Add</button>
-    </div>
-  `;
-  container.appendChild(useUpEl);
-
-  // Use-up event handlers
-  const addUseUpItem = async () => {
-    const input = useUpEl.querySelector('.use-up-input');
-    const val = input.value.trim();
-    if (!val) return;
-    // Support comma-separated entries
-    const newItems = val.split(',').map(s => s.trim()).filter(Boolean);
-    const current = await loadUseUpItems(weekKey);
-    const merged = [...current, ...newItems.filter(n => !current.some(c => c.toLowerCase() === n.toLowerCase()))];
-    await saveUseUpItems(weekKey, merged);
-    input.value = '';
-    renderPlanner(container, members, { onViewRecipe });
-  };
-
-  useUpEl.querySelector('.use-up-add-btn').addEventListener('click', addUseUpItem);
-  useUpEl.querySelector('.use-up-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); addUseUpItem(); }
-  });
-
-  useUpEl.querySelectorAll('.use-up-remove').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const item = btn.dataset.item;
-      const current = await loadUseUpItems(weekKey);
-      await saveUseUpItems(weekKey, current.filter(i => i !== item));
-      renderPlanner(container, members, { onViewRecipe });
-    });
-  });
-
-  // Step 1: Constraint cards for each day
+  // Day cards
   for (let i = 0; i < 7; i++) {
     const dayDate = new Date(currentWeekStart);
     dayDate.setDate(dayDate.getDate() + i);

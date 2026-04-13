@@ -1,4 +1,4 @@
-import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay, loadSnoozedTags, getSnoozedTags, saveSnoozedTags } from './firebase.js';
+import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay, loadSnoozedTags, getSnoozedTags, saveSnoozedTags, loadUseUpItems, saveUseUpItems } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
 import { initUserTags, getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
@@ -491,16 +491,21 @@ function setupPlannerPage() {
   loadRepeatWindow().then(val => { repeatSelect.value = String(val); });
   repeatSelect.addEventListener('change', () => {
     saveRepeatWindow(parseInt(repeatSelect.value, 10));
+    updatePrefsSummary();
   });
 
-  // Snooze toggle
-  const snoozeToggle = document.getElementById('snooze-toggle');
-  const snoozeBody = document.getElementById('snooze-body');
-  snoozeToggle.addEventListener('click', () => {
-    snoozeBody.classList.toggle('hidden');
-    snoozeToggle.classList.toggle('open');
+  // Planning Preferences card toggle
+  const prefsToggle = document.getElementById('prefs-toggle');
+  const prefsBody = document.getElementById('prefs-body');
+  prefsToggle.addEventListener('click', () => {
+    prefsBody.classList.toggle('hidden');
+    prefsToggle.classList.toggle('open');
   });
+
+  // Use-up items (now in prefs card)
+  setupPrefsUseUp();
   renderSnoozeChips();
+  updatePrefsSummary();
 
   document.getElementById('suggest-all-btn').addEventListener('click', async () => {
     const result = await suggestAllMeals(document.getElementById('planner-grid'), members);
@@ -554,7 +559,6 @@ function setupPlannerPage() {
 
 function renderSnoozeChips() {
   const container = document.getElementById('snooze-chips');
-  const countEl = document.getElementById('snooze-count');
   const recipes = getRecipes();
   const prefs = getAllPreferences();
 
@@ -566,9 +570,6 @@ function renderSnoozeChips() {
   }
   const allTags = [...tagSet].sort((a, b) => a.localeCompare(b));
   const snoozed = getSnoozedTags().map(t => t.toLowerCase());
-
-  const snoozedCount = allTags.filter(t => snoozed.includes(t.toLowerCase())).length;
-  countEl.textContent = snoozedCount ? `(${snoozedCount} snoozed)` : '';
 
   container.innerHTML = allTags.map(tag => {
     const isSnoozed = snoozed.includes(tag.toLowerCase());
@@ -587,8 +588,75 @@ function renderSnoozeChips() {
       }
       await saveSnoozedTags(current);
       renderSnoozeChips();
+      updatePrefsSummary();
     });
   });
+}
+
+function setupPrefsUseUp() {
+  const addBtn = document.getElementById('prefs-use-up-add');
+  const input = document.getElementById('prefs-use-up-input');
+
+  const addItems = async () => {
+    const val = input.value.trim();
+    if (!val) return;
+    const weekKey = getWeekKey();
+    const newItems = val.split(',').map(s => s.trim()).filter(Boolean);
+    const current = await loadUseUpItems(weekKey);
+    const merged = [...current, ...newItems.filter(n => !current.some(c => c.toLowerCase() === n.toLowerCase()))];
+    await saveUseUpItems(weekKey, merged);
+    input.value = '';
+    renderPrefsUseUp();
+    refreshPlanner();
+  };
+
+  addBtn.addEventListener('click', addItems);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addItems(); }
+  });
+}
+
+async function renderPrefsUseUp() {
+  const weekKey = getWeekKey();
+  const items = await loadUseUpItems(weekKey);
+  const container = document.getElementById('prefs-use-up-tags');
+
+  container.innerHTML = items.map(item =>
+    `<span class="use-up-tag">${item.replace(/</g, '&lt;')}<button class="use-up-remove" data-item="${item.replace(/"/g, '&quot;')}">&times;</button></span>`
+  ).join('');
+
+  container.querySelectorAll('.use-up-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const item = btn.dataset.item;
+      const current = await loadUseUpItems(weekKey);
+      await saveUseUpItems(weekKey, current.filter(i => i !== item));
+      renderPrefsUseUp();
+      refreshPlanner();
+    });
+  });
+
+  updatePrefsSummary();
+}
+
+async function updatePrefsSummary() {
+  const parts = [];
+
+  // Use-up count
+  const weekKey = getWeekKey();
+  const useUp = await loadUseUpItems(weekKey);
+  if (useUp.length) parts.push(`${useUp.length} use-up item${useUp.length > 1 ? 's' : ''}`);
+
+  // Snoozed count
+  const snoozed = getSnoozedTags();
+  if (snoozed.length) parts.push(`${snoozed.length} snoozed`);
+
+  // Repeat window
+  const repeat = document.getElementById('repeat-window');
+  const val = parseInt(repeat.value, 10);
+  if (val === 0) parts.push('no repeat limit');
+  else parts.push(`${val}wk repeat window`);
+
+  document.getElementById('prefs-summary').textContent = parts.join(' · ');
 }
 
 async function updateCommitStatus(weekKey) {
@@ -603,6 +671,7 @@ async function updateCommitStatus(weekKey) {
 
 function refreshPlanner() {
   renderSnoozeChips();
+  renderPrefsUseUp();
   const weekKey = getWeekKey();
   document.getElementById('week-label').textContent = getWeekLabel();
   const grid = document.getElementById('planner-grid');
