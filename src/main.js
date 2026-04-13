@@ -1,7 +1,7 @@
 import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay, loadSnoozedTags, getSnoozedTags, saveSnoozedTags, loadUseUpItems, saveUseUpItems } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
-import { initUserTags, getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
+import { initUserTags, getUserTagDefinitions, addUserTagDefinition, removeUserTagDefinition, renameUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, getDAYS, getCurrentWeekStart, resetWeekStart, getWeekStart } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
@@ -328,6 +328,7 @@ function setupHouseholdSettings() {
   document.getElementById('household-settings-btn').addEventListener('click', () => {
     renderMemberList();
     renderRestrictions();
+    renderManageTags();
     weekStartSelect.value = String(getWeekStartDay());
     modal.classList.remove('hidden');
   });
@@ -428,6 +429,96 @@ function setupHouseholdSettings() {
     renderRestrictions();
     showToast(`"${name}" added to household.`);
   }
+}
+
+function renderManageTags() {
+  const container = document.getElementById('manage-tags-list');
+  const defs = getUserTagDefinitions();
+  const recipes = getRecipes();
+  const prefs = getAllPreferences();
+
+  if (!defs.length) {
+    container.innerHTML = '<p style="color:var(--text-faint);font-size:0.85rem;">No tags yet.</p>';
+    return;
+  }
+
+  // Count recipes per tag
+  const counts = {};
+  for (const t of defs) counts[t.toLowerCase()] = 0;
+  for (const r of recipes) {
+    for (const t of (prefs[r.uid]?.userTags || [])) {
+      const key = t.toLowerCase();
+      if (key in counts) counts[key]++;
+    }
+  }
+
+  container.innerHTML = defs.map(t => `
+    <div class="manage-tag-row" data-tag="${t.replace(/"/g, '&quot;')}">
+      <span class="manage-tag-name">${t.replace(/</g, '&lt;')}</span>
+      <span class="manage-tag-recipe-count">${counts[t.toLowerCase()] || 0} recipe${counts[t.toLowerCase()] === 1 ? '' : 's'}</span>
+      <button class="btn manage-tag-rename" title="Rename or merge">Rename</button>
+      <button class="btn manage-tag-delete" title="Delete tag">Delete</button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.manage-tag-rename').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.manage-tag-row');
+      const oldName = row.dataset.tag;
+      const newName = prompt(`Rename "${oldName}" to:`, oldName);
+      if (!newName || newName.trim() === oldName) return;
+      const trimmed = newName.trim();
+
+      // Rename the definition
+      await renameUserTagDefinition(oldName, trimmed);
+
+      // Update all recipes: replace old tag with new tag
+      for (const r of recipes) {
+        const current = prefs[r.uid];
+        if (!current?.userTags) continue;
+        const list = current.userTags.slice();
+        const idx = list.findIndex(t => t.toLowerCase() === oldName.toLowerCase());
+        if (idx < 0) continue;
+        // If new tag already assigned, just remove old; otherwise replace
+        const hasNew = list.some(t => t.toLowerCase() === trimmed.toLowerCase());
+        if (hasNew) {
+          list.splice(idx, 1);
+        } else {
+          list[idx] = trimmed;
+        }
+        await updateRecipePrefs(r.uid, { ...current, userTags: list });
+      }
+
+      document.dispatchEvent(new CustomEvent('user-tags-changed'));
+      renderManageTags();
+      showToast(`Renamed "${oldName}" to "${trimmed}"`);
+    });
+  });
+
+  container.querySelectorAll('.manage-tag-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.manage-tag-row');
+      const tagName = row.dataset.tag;
+      const count = counts[tagName.toLowerCase()] || 0;
+      if (!confirm(`Delete tag "${tagName}"? It will be removed from ${count} recipe${count === 1 ? '' : 's'}.`)) return;
+
+      await removeUserTagDefinition(tagName);
+
+      // Remove from all recipes
+      for (const r of recipes) {
+        const current = prefs[r.uid];
+        if (!current?.userTags) continue;
+        const list = current.userTags.filter(t => t.toLowerCase() !== tagName.toLowerCase());
+        if (list.length !== current.userTags.length) {
+          await updateRecipePrefs(r.uid, { ...current, userTags: list });
+        }
+      }
+
+      document.dispatchEvent(new CustomEvent('user-tags-changed'));
+      renderManageTags();
+      showToast(`Tag "${tagName}" deleted.`);
+    });
+  });
 }
 
 // === Navigation ===
@@ -1161,6 +1252,7 @@ function setupManagePage() {
   });
 
   document.getElementById('manage-search').addEventListener('input', () => refreshManageRecipeList());
+  renderManageTagFilter();
 
   // Export all recipes
   document.getElementById('export-all-btn').addEventListener('click', () => {
@@ -1643,6 +1735,29 @@ function setupSharedPacks() {
       uid: 'shared_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     }));
     await bulkSaveRecipes(recipes);
+
+    // Apply bulk tags if specified
+    const tagInput = document.getElementById('shared-import-tag-input');
+    const tagStr = tagInput ? tagInput.value.trim() : '';
+    if (tagStr) {
+      const tags = tagStr.split(',').map(t => t.trim()).filter(Boolean);
+      for (const tag of tags) {
+        await addUserTagDefinition(tag);
+      }
+      for (const r of recipes) {
+        const current = getRecipePrefs(r.uid);
+        const existing = current.userTags || [];
+        const merged = [...existing];
+        for (const tag of tags) {
+          if (!merged.some(t => t.toLowerCase() === tag.toLowerCase())) {
+            merged.push(tag);
+          }
+        }
+        await updateRecipePrefs(r.uid, { ...current, userTags: merged });
+      }
+      tagInput.value = '';
+    }
+
     await loadHouseholdRecipes();
     await loadRecipes();
     refreshManageRecipeList();
@@ -2524,11 +2639,63 @@ function showImportPreview(recipes) {
   preview.classList.remove('hidden');
 }
 
+let manageTagFilter = ''; // currently selected tag filter for recipe box
+
+function renderManageTagFilter() {
+  const container = document.getElementById('manage-tag-filter');
+  const recipes = getRecipes();
+  const prefs = getAllPreferences();
+
+  // Collect all tags with counts
+  const tagCounts = {};
+  for (const r of recipes) {
+    for (const c of (r.categories || [])) {
+      const key = c.toLowerCase();
+      tagCounts[key] = tagCounts[key] || { name: c, count: 0 };
+      tagCounts[key].count++;
+    }
+    for (const t of (prefs[r.uid]?.userTags || [])) {
+      const key = t.toLowerCase();
+      tagCounts[key] = tagCounts[key] || { name: t, count: 0 };
+      tagCounts[key].count++;
+    }
+  }
+
+  const sorted = Object.values(tagCounts).sort((a, b) => a.name.localeCompare(b.name));
+  if (!sorted.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = `<button class="manage-tag-chip${!manageTagFilter ? ' active' : ''}" data-tag="">All</button>` +
+    sorted.map(t => {
+      const active = manageTagFilter.toLowerCase() === t.name.toLowerCase() ? ' active' : '';
+      return `<button class="manage-tag-chip${active}" data-tag="${t.name.replace(/"/g, '&quot;')}">${t.name.replace(/</g, '&lt;')} <span class="manage-tag-count">${t.count}</span></button>`;
+    }).join('');
+
+  container.querySelectorAll('.manage-tag-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      manageTagFilter = chip.dataset.tag;
+      renderManageTagFilter();
+      refreshManageRecipeList();
+    });
+  });
+}
+
 function refreshManageRecipeList() {
   const container = document.getElementById('manage-recipe-list');
   const query = document.getElementById('manage-search').value;
-  const recipes = filterRecipes(query);
+  let recipes = filterRecipes(query);
   const prefs = getAllPreferences();
+
+  // Apply tag filter
+  if (manageTagFilter) {
+    const filterLower = manageTagFilter.toLowerCase();
+    recipes = recipes.filter(r => {
+      const recipeTags = [
+        ...(r.categories || []),
+        ...(prefs[r.uid]?.userTags || []),
+      ].map(t => t.toLowerCase());
+      return recipeTags.includes(filterLower);
+    });
+  }
 
   // Sort favorites to the top, preserving alphabetical order within each group
   recipes.sort((a, b) => {
@@ -2657,6 +2824,7 @@ function setupEditModal() {
     await addUserTagDefinition(name);
     editModalUserTags.add(name.toLowerCase());
     input.value = '';
+    document.dispatchEvent(new CustomEvent('user-tags-changed'));
     // Re-render the pill list, but preserve the working set we just added to.
     const container = document.getElementById('edit-recipe-user-tags');
     const defs = getUserTagDefinitions();

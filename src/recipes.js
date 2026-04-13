@@ -282,8 +282,11 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
         preferences[r.uid] = { ...(preferences[r.uid] || {}), userTags: newList };
         refreshConvenienceChips();
       }
-      renderTagPills();
+      // Refresh all visible tag pill sections, not just this card
+      document.dispatchEvent(new CustomEvent('user-tags-changed'));
     }
+
+    document.addEventListener('user-tags-changed', renderTagPills);
 
     tagAddBtn.addEventListener('click', (e) => {
       e.stopPropagation();

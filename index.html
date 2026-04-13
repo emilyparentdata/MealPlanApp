@@ -379,6 +379,10 @@
             </div>
             <div id="shared-preview" class="hidden">
               <div id="shared-preview-content"></div>
+              <div class="shared-import-tags">
+                <label class="prefs-section-label">Tag imported recipes</label>
+                <input type="text" id="shared-import-tag-input" placeholder="e.g. untested, toddler friendly (comma separated)">
+              </div>
               <div class="import-actions">
                 <button id="shared-import-btn" class="btn primary">Import Selected</button>
                 <button id="shared-cancel-btn" class="btn">Cancel</button>
@@ -428,6 +432,7 @@
         </button>
         <div id="recipe-list-body" class="recipe-list-body hidden">
           <input type="text" id="manage-search" placeholder="Search recipes...">
+          <div id="manage-tag-filter" class="manage-tag-filter"></div>
           <div id="manage-recipe-list" class="recipe-grid"></div>
           <button id="export-all-btn" class="btn" style="margin-top:1rem">Export All Recipes</button>
         </div>
@@ -485,6 +490,12 @@
         <label class="settings-label">Dietary Restrictions</label>
         <p class="settings-hint">Tag each person's allergies or dietary needs. Recipes with conflicting allergens will show warnings.</p>
         <div id="household-restrictions-list"></div>
+
+        <hr class="settings-divider">
+
+        <label class="settings-label">Manage Tags</label>
+        <p class="settings-hint">Rename, merge, or delete your recipe tags. Merging replaces one tag with another across all recipes.</p>
+        <div id="manage-tags-list"></div>
       </div>
     </div>
   </div>

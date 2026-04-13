@@ -43,6 +43,26 @@ export async function removeUserTagDefinition(name) {
   await saveUserTagDefinitions(definitions);
 }
 
+export async function renameUserTagDefinition(oldName, newName) {
+  const trimmed = (newName || '').trim();
+  if (!trimmed) return false;
+  const oldNorm = normalize(oldName);
+  const newNorm = normalize(trimmed);
+  // Update definition list
+  definitions = definitions.map(t => normalize(t) === oldNorm ? trimmed : t);
+  // If newName already exists as a separate entry, deduplicate
+  const seen = new Set();
+  definitions = definitions.filter(t => {
+    const n = normalize(t);
+    if (seen.has(n)) return false;
+    seen.add(n);
+    return true;
+  });
+  definitions.sort((a, b) => a.localeCompare(b));
+  await saveUserTagDefinitions(definitions);
+  return true;
+}
+
 // Per-recipe assignment helpers — operate on the existing preferences doc.
 
 export function getRecipeUserTags(recipeUid) {
