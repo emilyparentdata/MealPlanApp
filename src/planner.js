@@ -300,6 +300,143 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
 
     container.appendChild(dayEl);
   }
+
+  // Drag-and-drop to swap recipes between days
+  setupDragAndDrop(container, plan, members, { onViewRecipe });
+}
+
+function setupDragAndDrop(container, plan, members, opts) {
+  const dayEls = container.querySelectorAll('.planner-day');
+  let dragDay = null;
+
+  // --- HTML5 drag (desktop) ---
+  dayEls.forEach(dayEl => {
+    const mealArea = dayEl.querySelector('.planner-day-meal');
+    mealArea.setAttribute('draggable', 'true');
+
+    mealArea.addEventListener('dragstart', (e) => {
+      const uid = dayEl.querySelector('.meal-combo')?.dataset.recipeUid;
+      if (!uid) { e.preventDefault(); return; }
+      dragDay = dayEl.dataset.day;
+      dayEl.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragDay);
+    });
+
+    mealArea.addEventListener('dragend', () => {
+      dayEl.classList.remove('dragging');
+      dayEls.forEach(d => d.classList.remove('drag-over'));
+      dragDay = null;
+    });
+
+    dayEl.addEventListener('dragover', (e) => {
+      if (!dragDay || dragDay === dayEl.dataset.day) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      dayEl.classList.add('drag-over');
+    });
+
+    dayEl.addEventListener('dragleave', () => {
+      dayEl.classList.remove('drag-over');
+    });
+
+    dayEl.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dayEl.classList.remove('drag-over');
+      const fromDay = e.dataTransfer.getData('text/plain');
+      const toDay = dayEl.dataset.day;
+      if (!fromDay || fromDay === toDay) return;
+      await swapDays(container, plan, members, fromDay, toDay, opts);
+    });
+
+    // --- Touch drag (mobile) ---
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let touchActive = false;
+    let ghost = null;
+
+    mealArea.addEventListener('touchstart', (e) => {
+      const uid = dayEl.querySelector('.meal-combo')?.dataset.recipeUid;
+      if (!uid) return;
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchActive = false;
+      dragDay = dayEl.dataset.day;
+    }, { passive: true });
+
+    mealArea.addEventListener('touchmove', (e) => {
+      if (!dragDay || dragDay !== dayEl.dataset.day) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - touchStartX);
+      const dy = Math.abs(touch.clientY - touchStartY);
+
+      // Require some movement to activate drag
+      if (!touchActive && (dx > 10 || dy > 10)) {
+        touchActive = true;
+        dayEl.classList.add('dragging');
+        // Create ghost element
+        ghost = document.createElement('div');
+        ghost.className = 'drag-ghost';
+        const recipeName = dayEl.querySelector('.meal-search')?.value || 'Recipe';
+        ghost.textContent = recipeName;
+        document.body.appendChild(ghost);
+      }
+
+      if (touchActive) {
+        e.preventDefault();
+        ghost.style.left = (touch.clientX - 60) + 'px';
+        ghost.style.top = (touch.clientY - 20) + 'px';
+
+        // Highlight target
+        dayEls.forEach(d => {
+          d.classList.remove('drag-over');
+          const rect = d.getBoundingClientRect();
+          if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+              touch.clientY >= rect.top && touch.clientY <= rect.bottom &&
+              d.dataset.day !== dragDay) {
+            d.classList.add('drag-over');
+          }
+        });
+      }
+    }, { passive: false });
+
+    mealArea.addEventListener('touchend', async () => {
+      if (!touchActive) { dragDay = null; return; }
+      dayEl.classList.remove('dragging');
+      if (ghost) { ghost.remove(); ghost = null; }
+
+      const target = container.querySelector('.planner-day.drag-over');
+      dayEls.forEach(d => d.classList.remove('drag-over'));
+
+      if (target && target.dataset.day !== dragDay) {
+        await swapDays(container, plan, members, dragDay, target.dataset.day, opts);
+      }
+      touchActive = false;
+      dragDay = null;
+    });
+  });
+}
+
+async function swapDays(container, plan, members, fromDay, toDay, opts) {
+  const fromData = plan.days[fromDay] || {};
+  const toData = plan.days[toDay] || {};
+
+  // Swap recipe, sides, and servings — keep who's home, convenience, etc. per day
+  const swapFields = ['recipeUid', 'sides', 'servings'];
+  for (const field of swapFields) {
+    const tmp = fromData[field];
+    fromData[field] = toData[field];
+    toData[field] = tmp;
+  }
+
+  plan.days[fromDay] = fromData;
+  plan.days[toDay] = toData;
+  plan.updated = Date.now();
+
+  const weekKey = getWeekKey();
+  await savePlan(weekKey, plan);
+  await renderPlanner(container, members, opts);
 }
 
 function refreshDropdownMarkers(container, plan, recipes) {
