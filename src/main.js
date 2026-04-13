@@ -730,24 +730,7 @@ async function renderPrefsUseUp() {
 }
 
 async function updatePrefsSummary() {
-  const parts = [];
-
-  // Use-up count
-  const weekKey = getWeekKey();
-  const useUp = await loadUseUpItems(weekKey);
-  if (useUp.length) parts.push(`${useUp.length} use-up item${useUp.length > 1 ? 's' : ''}`);
-
-  // Snoozed count
-  const snoozed = getSnoozedTags();
-  if (snoozed.length) parts.push(`${snoozed.length} snoozed`);
-
-  // Repeat window
-  const repeat = document.getElementById('repeat-window');
-  const val = parseInt(repeat.value, 10);
-  if (val === 0) parts.push('no repeat limit');
-  else parts.push(`${val}wk repeat window`);
-
-  document.getElementById('prefs-summary').textContent = parts.join(' · ');
+  document.getElementById('prefs-summary').textContent = 'Use-up items, snoozed tags, repeat settings';
 }
 
 async function updateCommitStatus(weekKey) {
