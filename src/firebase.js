@@ -241,6 +241,36 @@ export async function saveRestrictions(restrictions) {
   await db.collection('households').doc(householdId).update({ restrictions });
 }
 
+// === Snoozed Tags (household setting) ===
+
+let _cachedSnoozedTags = [];
+
+export async function loadSnoozedTags() {
+  if (!householdId || !firebaseEnabled) {
+    const saved = localStorage.getItem("snoozed_tags");
+    _cachedSnoozedTags = saved ? JSON.parse(saved) : [];
+    return _cachedSnoozedTags;
+  }
+  const doc = await db.collection('households').doc(householdId).get();
+  if (doc.exists) {
+    _cachedSnoozedTags = doc.data().snoozedTags || [];
+  }
+  return _cachedSnoozedTags;
+}
+
+export function getSnoozedTags() {
+  return _cachedSnoozedTags;
+}
+
+export async function saveSnoozedTags(tags) {
+  _cachedSnoozedTags = tags;
+  if (!householdId || !firebaseEnabled) {
+    localStorage.setItem("snoozed_tags", JSON.stringify(tags));
+    return;
+  }
+  await db.collection('households').doc(householdId).update({ snoozedTags: tags });
+}
+
 // === Week Start Day (household setting, 0=Sun 1=Mon 6=Sat) ===
 
 let _cachedWeekStartDay = 1; // default Monday

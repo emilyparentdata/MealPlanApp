@@ -1,6 +1,6 @@
 import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
-import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, getRestrictions, getWeekStartDay } from './firebase.js';
+import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, getRestrictions, getWeekStartDay, getSnoozedTags } from './firebase.js';
 import { CONVENIENCE_OPTIONS, getConvenienceLabel, recipeMatchesConvenience } from './convenience.js';
 import { getUserTagDefinitions, recipeMatchesUserTag } from './userTags.js';
 
@@ -510,9 +510,20 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
   const scored = [];
   let filteredByConvenience = 0;
   let filteredByUserTag = 0;
+  const snoozed = getSnoozedTags().map(t => t.toLowerCase());
   for (const recipe of recipes) {
     // Don't repeat within the same week
     if (assignedThisWeek.has(recipe.uid)) continue;
+
+    // Skip recipes matching snoozed tags
+    if (snoozed.length > 0) {
+      const recipePref = prefs[recipe.uid] || {};
+      const recipeTags = [
+        ...(recipe.categories || []),
+        ...(recipePref.userTags || []),
+      ].map(t => t.toLowerCase());
+      if (recipeTags.some(t => snoozed.includes(t))) continue;
+    }
 
     const recipePref = prefs[recipe.uid] || {};
 

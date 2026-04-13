@@ -118,6 +118,17 @@
           <option value="0">No limit (never repeat)</option>
         </select>
       </div>
+      <div id="snooze-section" class="snooze-section">
+        <button id="snooze-toggle" class="snooze-toggle">
+          <span>Snoozed Tags</span>
+          <span id="snooze-count" class="snooze-count"></span>
+          <span class="toggle-arrow">&#9654;</span>
+        </button>
+        <div id="snooze-body" class="snooze-body hidden">
+          <p class="section-help">Tap a tag to snooze it. Snoozed tags are skipped when suggesting meals. Useful for seasonal recipes or things you want to take a break from.</p>
+          <div id="snooze-chips"></div>
+        </div>
+      </div>
       <div id="planner-grid"></div>
       <div class="planner-actions">
         <button id="suggest-all-btn" class="btn primary large">Suggest Meals</button>

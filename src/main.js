@@ -1,4 +1,4 @@
-import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay } from './firebase.js';
+import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay, loadSnoozedTags, getSnoozedTags, saveSnoozedTags } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
 import { initUserTags, getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
@@ -75,6 +75,7 @@ async function initApp(household) {
   // Get members and restrictions from household
   members = await getHouseholdMembers();
   await loadRestrictions();
+  await loadSnoozedTags();
   setupNavigation();
   setupPlannerPage();
   setupPlanViewPage();
@@ -492,6 +493,15 @@ function setupPlannerPage() {
     saveRepeatWindow(parseInt(repeatSelect.value, 10));
   });
 
+  // Snooze toggle
+  const snoozeToggle = document.getElementById('snooze-toggle');
+  const snoozeBody = document.getElementById('snooze-body');
+  snoozeToggle.addEventListener('click', () => {
+    snoozeBody.classList.toggle('hidden');
+    snoozeToggle.classList.toggle('open');
+  });
+  renderSnoozeChips();
+
   document.getElementById('suggest-all-btn').addEventListener('click', async () => {
     const result = await suggestAllMeals(document.getElementById('planner-grid'), members);
     refreshPlanner();
@@ -542,6 +552,45 @@ function setupPlannerPage() {
   });
 }
 
+function renderSnoozeChips() {
+  const container = document.getElementById('snooze-chips');
+  const countEl = document.getElementById('snooze-count');
+  const recipes = getRecipes();
+  const prefs = getAllPreferences();
+
+  // Collect all unique tags: categories + user tags
+  const tagSet = new Set();
+  for (const r of recipes) {
+    for (const c of (r.categories || [])) tagSet.add(c);
+    for (const t of (prefs[r.uid]?.userTags || [])) tagSet.add(t);
+  }
+  const allTags = [...tagSet].sort((a, b) => a.localeCompare(b));
+  const snoozed = getSnoozedTags().map(t => t.toLowerCase());
+
+  const snoozedCount = allTags.filter(t => snoozed.includes(t.toLowerCase())).length;
+  countEl.textContent = snoozedCount ? `(${snoozedCount} snoozed)` : '';
+
+  container.innerHTML = allTags.map(tag => {
+    const isSnoozed = snoozed.includes(tag.toLowerCase());
+    return `<button class="snooze-chip${isSnoozed ? ' snoozed' : ''}" data-tag="${tag.replace(/"/g, '&quot;')}">${tag.replace(/</g, '&lt;')}</button>`;
+  }).join('');
+
+  container.querySelectorAll('.snooze-chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+      const tag = chip.dataset.tag;
+      let current = getSnoozedTags();
+      const norm = tag.toLowerCase();
+      if (current.some(t => t.toLowerCase() === norm)) {
+        current = current.filter(t => t.toLowerCase() !== norm);
+      } else {
+        current.push(tag);
+      }
+      await saveSnoozedTags(current);
+      renderSnoozeChips();
+    });
+  });
+}
+
 async function updateCommitStatus(weekKey) {
   const el = document.getElementById('commit-status');
   const committed = await loadCommittedPlan(weekKey);
@@ -553,6 +602,7 @@ async function updateCommitStatus(weekKey) {
 }
 
 function refreshPlanner() {
+  renderSnoozeChips();
   const weekKey = getWeekKey();
   document.getElementById('week-label').textContent = getWeekLabel();
   const grid = document.getElementById('planner-grid');
