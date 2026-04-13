@@ -1,4 +1,4 @@
-import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay } from './firebase.js';
+import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
 import { initUserTags, getUserTagDefinitions, addUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
@@ -152,6 +152,20 @@ function setupLoginPage() {
     }
     try {
       await signUpWithEmail(email, password);
+    } catch (e) {
+      showLoginError(friendlyAuthError(e.code));
+    }
+  });
+
+  document.getElementById('forgot-password-btn').addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value.trim();
+    if (!email) {
+      showLoginError('Enter your email address above, then tap "Forgot password?"');
+      return;
+    }
+    try {
+      await sendPasswordReset(email);
+      showLoginError('Password reset email sent! Check your inbox.');
     } catch (e) {
       showLoginError(friendlyAuthError(e.code));
     }

@@ -71,6 +71,10 @@ export async function signInWithEmail(email, password) {
   return auth.signInWithEmailAndPassword(email, password);
 }
 
+export async function sendPasswordReset(email) {
+  return auth.sendPasswordResetEmail(email);
+}
+
 export async function signUpWithEmail(email, password) {
   return auth.createUserWithEmailAndPassword(email, password);
 }

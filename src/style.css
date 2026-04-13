@@ -131,6 +131,17 @@ body {
 }
 .login-actions .btn { flex: 1; }
 
+.forgot-password-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 0.25rem;
+  text-decoration: underline;
+}
+.forgot-password-btn:hover { color: var(--primary); }
 .beta-code-input {
   width: 100%;
   margin-top: 0.75rem;
