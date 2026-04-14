@@ -844,6 +844,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   flex-wrap: wrap;
   gap: 0.25rem;
   margin-top: 0.35rem;
+  margin-bottom: 0.6rem;
 }
 .allergen-chip {
   font-size: 0.7rem;
@@ -1287,7 +1288,28 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   border-radius: var(--r-card);
   padding: 1rem;
   border: 0.8px solid var(--border);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.planner-day.has-meal {
+  border-color: var(--primary-light);
+  background: var(--card);
+}
+.planner-day.has-meal .planner-day-header h3 {
+  color: var(--primary);
+}
+.planner-day.no-meal {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--card),
+    var(--card) 10px,
+    var(--bg) 10px,
+    var(--bg) 20px
+  );
+  border-style: dashed;
+  border-color: var(--border);
+}
+.planner-day.no-meal .planner-day-header h3 {
+  color: var(--text-faint);
 }
 .planner-day.dragging {
   opacity: 0.5;
@@ -1356,10 +1378,12 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.5rem;
+  flex-wrap: wrap;
 }
 /* Searchable meal combo-box */
 .meal-combo {
-  flex: 1;
+  flex: 1 1 200px;
+  min-width: 200px;
   position: relative;
 }
 .meal-combo .meal-search {

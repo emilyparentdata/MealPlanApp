@@ -21,10 +21,20 @@ async function init() {
   setupLoginPage();
   setupHouseholdPage();
 
+  let currentUserUid = null;
+
   // Listen for auth state changes
   onAuthStateChanged(async (user) => {
+    // If token refresh fires with the same signed-in user and the app is
+    // already initialized, do nothing — otherwise we'd hide app-container
+    // and lose scroll position. This was the cause of the scroll-jump bug.
+    if (user && appInitialized && user.uid === currentUserUid) {
+      return;
+    }
+
     hideAll();
     appInitialized = false;
+    currentUserUid = user ? user.uid : null;
 
     if (!user) {
       document.getElementById('login-screen').classList.remove('hidden');
@@ -2972,12 +2982,31 @@ async function showDayPicker(recipe, anchorEl, onDone) {
 
   await renderPickerWeek();
 
-  // Position near the anchor button
-  const rect = anchorEl.getBoundingClientRect();
-  picker.style.position = 'fixed';
-  picker.style.left = rect.left + 'px';
-  picker.style.top = (rect.bottom + 4) + 'px';
+  // Position near the anchor button — show first to measure actual size
   picker.classList.remove('hidden');
+  const rect = anchorEl.getBoundingClientRect();
+  const pickerRect = picker.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const margin = 8;
+
+  // Clamp left so picker stays on-screen
+  let left = rect.left;
+  if (left + pickerRect.width > viewportWidth - margin) {
+    left = Math.max(margin, viewportWidth - pickerRect.width - margin);
+  }
+
+  // Prefer below the anchor, flip above if no room
+  let top = rect.bottom + 4;
+  if (top + pickerRect.height > viewportHeight - margin) {
+    top = Math.max(margin, rect.top - pickerRect.height - 4);
+  }
+
+  picker.style.position = 'fixed';
+  picker.style.left = left + 'px';
+  picker.style.top = top + 'px';
+  picker.style.bottom = 'auto';
+  picker.style.right = 'auto';
 }
 
 function setupAddToPlan() {

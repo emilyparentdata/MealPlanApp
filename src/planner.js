@@ -136,7 +136,9 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
     const selectedRecipe = dayData.recipeUid ? recipes.find(r => r.uid === dayData.recipeUid) : null;
 
     const dayEl = document.createElement('div');
-    dayEl.className = 'planner-day';
+    const isSkipDay = dayData.skip === true || dayData.skip === 'skip' || dayData.skip === 'leftovers';
+    const hasMeal = !!dayData.recipeUid || isSkipDay;
+    dayEl.className = `planner-day${hasMeal ? ' has-meal' : ' no-meal'}`;
     dayEl.dataset.day = dayName;
 
     dayEl.innerHTML = `
