@@ -73,7 +73,9 @@ function renderChecklist(container, meals) {
 
   let html = '';
   for (const [category, items] of groups) {
-    const visibleItems = items.filter(item => !deletes[item.key]);
+    const visibleItems = items
+      .filter(item => !deletes[item.key])
+      .sort((a, b) => (checked[a.key] ? 1 : 0) - (checked[b.key] ? 1 : 0));
     if (!visibleItems.length) continue;
     const catKey = CATEGORY_KEYS[category] || 'other';
     html += `<div class="grocery-category" data-category="${catKey}">`;
@@ -85,16 +87,15 @@ function renderChecklist(container, meals) {
       const key = item.key;
       const displayText = edits[key] || item.display;
       const isChecked = checked[key] ? 'checked' : '';
-      const checkedClass = checked[key] ? ' checked' : '';
+      const liClass = checked[key] ? ' class="checked"' : '';
       const mealNote = `<span class="grocery-meal-note">${item.meals.map(escHtml).join(', ')}</span>`;
-      html += `<li draggable="true" data-ingredient-key="${escAttr(key)}">
-        <label class="grocery-check${checkedClass}">
+      html += `<li draggable="true" data-ingredient-key="${escAttr(key)}"${liClass}>
+        <label class="grocery-check">
           <input type="checkbox" data-key="${escAttr(key)}" ${isChecked}>
-          <span class="grocery-item-text">${escHtml(displayText)}</span>
-          ${mealNote}
         </label>
+        <span class="grocery-item-text" data-key="${escAttr(key)}" data-display="${escAttr(displayText)}" title="Tap to edit">${escHtml(displayText)}</span>
+        ${mealNote}
         <div class="grocery-item-actions">
-          <button class="grocery-edit-btn" data-key="${escAttr(key)}" data-display="${escAttr(displayText)}" title="Edit">&#9998;</button>
           <button class="grocery-delete-btn" data-key="${escAttr(key)}" title="Remove">&times;</button>
         </div>
       </li>`;
@@ -104,26 +105,24 @@ function renderChecklist(container, meals) {
 
   container.innerHTML = html;
 
-  // Wire up checkboxes
+  // Wire up checkboxes — re-render so checked items sink to the bottom.
   container.querySelectorAll('.grocery-check input').forEach(cb => {
     cb.addEventListener('change', () => {
-      cb.closest('label').classList.toggle('checked', cb.checked);
       const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
       if (cb.checked) { state[cb.dataset.key] = true; } else { delete state[cb.dataset.key]; }
       localStorage.setItem(storageKey, JSON.stringify(state));
-      updateProgress(container);
+      renderChecklist(container, meals);
     });
   });
 
-  // Wire up edit buttons
-  container.querySelectorAll('.grocery-edit-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  // Tap the item text to edit (replaces the old pencil button).
+  container.querySelectorAll('.grocery-item-text').forEach(textEl => {
+    textEl.addEventListener('click', (e) => {
       e.stopPropagation();
-      const li = btn.closest('li');
-      const textEl = li.querySelector('.grocery-item-text');
-      const currentText = btn.dataset.display;
+      const li = textEl.closest('li');
+      const key = textEl.dataset.key;
+      const currentText = textEl.dataset.display;
 
-      // Replace text with an input
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'grocery-edit-input';
@@ -132,14 +131,14 @@ function renderChecklist(container, meals) {
       input.focus();
       input.select();
 
-      // Hide actions while editing
-      li.querySelector('.grocery-item-actions').style.display = 'none';
+      const actions = li.querySelector('.grocery-item-actions');
+      if (actions) actions.style.display = 'none';
 
       const save = () => {
         const newText = input.value.trim();
         if (newText && newText !== currentText) {
           const allEdits = JSON.parse(localStorage.getItem(editsKey) || '{}');
-          allEdits[btn.dataset.key] = newText;
+          allEdits[key] = newText;
           localStorage.setItem(editsKey, JSON.stringify(allEdits));
         }
         renderChecklist(container, meals);
@@ -212,18 +211,46 @@ function setupGroceryDrag(container, meals) {
   });
 
   // --- Touch drag (mobile) ---
+  // Drag activates only after a 400ms long-press so ordinary vertical swipes
+  // scroll the page. Any movement before the timer fires aborts drag mode.
+  const LONG_PRESS_MS = 400;
+  const MOVE_TOLERANCE = 10;
   let touchKey = null;
   let touchActive = false;
+  let longPressTimer = null;
   let ghost = null;
   let startX = 0, startY = 0;
 
+  const cancelLongPress = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  };
+
   items.forEach(li => {
     li.addEventListener('touchstart', (e) => {
-      touchKey = li.dataset.ingredientKey;
+      cancelLongPress();
       touchActive = false;
+      touchKey = li.dataset.ingredientKey;
       const touch = e.touches[0];
       startX = touch.clientX;
       startY = touch.clientY;
+
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        if (touchKey !== li.dataset.ingredientKey) return;
+        touchActive = true;
+        li.classList.add('grocery-dragging');
+        ghost = document.createElement('div');
+        ghost.className = 'drag-ghost';
+        const text = li.querySelector('.grocery-item-text');
+        ghost.textContent = text ? text.textContent.slice(0, 30) : 'Item';
+        ghost.style.left = (startX - 50) + 'px';
+        ghost.style.top = (startY - 16) + 'px';
+        document.body.appendChild(ghost);
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, LONG_PRESS_MS);
     }, { passive: true });
 
     li.addEventListener('touchmove', (e) => {
@@ -232,34 +259,34 @@ function setupGroceryDrag(container, meals) {
       const dx = Math.abs(touch.clientX - startX);
       const dy = Math.abs(touch.clientY - startY);
 
-      if (!touchActive && (dx > 10 || dy > 10)) {
-        touchActive = true;
-        li.classList.add('grocery-dragging');
-        ghost = document.createElement('div');
-        ghost.className = 'drag-ghost';
-        const text = li.querySelector('.grocery-item-text');
-        ghost.textContent = text ? text.textContent.slice(0, 30) : 'Item';
-        document.body.appendChild(ghost);
+      // Pre-activation: any movement aborts and lets the page scroll normally.
+      if (!touchActive) {
+        if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
+          cancelLongPress();
+          touchKey = null;
+        }
+        return;
       }
 
-      if (touchActive) {
-        e.preventDefault();
-        ghost.style.left = (touch.clientX - 50) + 'px';
-        ghost.style.top = (touch.clientY - 16) + 'px';
+      e.preventDefault();
+      ghost.style.left = (touch.clientX - 50) + 'px';
+      ghost.style.top = (touch.clientY - 16) + 'px';
 
-        categories.forEach(c => {
-          c.classList.remove('grocery-drag-over');
-          const rect = c.getBoundingClientRect();
-          if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
-              touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-            c.classList.add('grocery-drag-over');
-          }
-        });
-      }
+      categories.forEach(c => {
+        c.classList.remove('grocery-drag-over');
+        const rect = c.getBoundingClientRect();
+        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          c.classList.add('grocery-drag-over');
+        }
+      });
     }, { passive: false });
 
-    li.addEventListener('touchend', () => {
+    li.addEventListener('touchend', (e) => {
+      cancelLongPress();
       if (!touchActive) { touchKey = null; return; }
+      // Suppress the synthetic click after a long-press release.
+      e.preventDefault();
       li.classList.remove('grocery-dragging');
       if (ghost) { ghost.remove(); ghost = null; }
 
@@ -270,6 +297,15 @@ function setupGroceryDrag(container, meals) {
         saveCategoryOverride(touchKey, target.dataset.category);
         renderChecklist(container, meals);
       }
+      touchActive = false;
+      touchKey = null;
+    });
+
+    li.addEventListener('touchcancel', () => {
+      cancelLongPress();
+      if (ghost) { ghost.remove(); ghost = null; }
+      li.classList.remove('grocery-dragging');
+      categories.forEach(c => c.classList.remove('grocery-drag-over'));
       touchActive = false;
       touchKey = null;
     });
@@ -811,9 +847,7 @@ function buildGroceryText(meals) {
       lines.push(category.toUpperCase());
     }
     for (const item of visible) {
-      const displayText = edits[item.key] || item.display;
-      let line = `[ ] ${displayText}  (${item.meals.join(', ')})`;
-      lines.push(line);
+      lines.push(edits[item.key] || item.display);
     }
   }
 
@@ -826,7 +860,7 @@ function buildGroceryText(meals) {
       lines.push('');
       lines.push('EXTRA ITEMS');
       for (const item of visibleExtras) {
-        lines.push(`[ ] ${item}`);
+        lines.push(item);
       }
     }
   }
@@ -838,7 +872,7 @@ export function getGroceryText() {
   if (!lastMeals && !extraItems.length) return '';
   if (!lastMeals) {
     return extraItems.length
-      ? 'EXTRA ITEMS\n' + extraItems.map(i => `[ ] ${i}`).join('\n')
+      ? 'EXTRA ITEMS\n' + extraItems.join('\n')
       : '';
   }
   return buildGroceryText(lastMeals);

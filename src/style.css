@@ -1862,18 +1862,27 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   flex: 1;
   font-size: 0.95rem;
   line-height: 1.5;
+  cursor: text;
+  padding: 0.2rem 0.35rem;
+  border-radius: 4px;
+  transition: background 0.1s;
+  min-width: 0;
+}
+.grocery-item-text:hover {
+  background: var(--bg);
 }
 .grocery-meal-note {
   font-size: 0.75rem;
   color: var(--text-light);
   white-space: nowrap;
 }
-.grocery-check.checked .grocery-item-text {
+.grocery-checklist-items li.checked .grocery-item-text,
+.grocery-checklist-items li.checked .grocery-meal-note {
   text-decoration: line-through;
   color: var(--text-light);
 }
-.grocery-check.checked .grocery-meal-note {
-  text-decoration: line-through;
+.grocery-checklist-items li.checked {
+  opacity: 0.6;
 }
 
 /* Item edit/delete actions */
@@ -1881,10 +1890,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   display: flex;
   align-items: center;
   position: relative;
-}
-.grocery-check {
-  flex: 1;
-  min-width: 0;
+  gap: 0.25rem;
 }
 .grocery-item-actions {
   display: flex;
@@ -1896,7 +1902,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .grocery-checklist-items li:hover .grocery-item-actions {
   opacity: 1;
 }
-.grocery-edit-btn,
 .grocery-delete-btn {
   background: none;
   border: none;
@@ -1906,10 +1911,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
   padding: 0.2rem 0.4rem;
   line-height: 1;
   border-radius: 4px;
-}
-.grocery-edit-btn:hover {
-  color: var(--primary);
-  background: var(--bg);
 }
 .grocery-delete-btn:hover {
   color: var(--love);

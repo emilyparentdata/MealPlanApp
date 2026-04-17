@@ -940,6 +940,13 @@ function setupGroceryPage() {
     refreshGrocery();
     showToast('All items unchecked.');
   });
+
+  document.getElementById('jump-breakdown-btn').addEventListener('click', () => {
+    const details = document.querySelector('.meal-breakdown');
+    if (!details) return;
+    details.open = true;
+    details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 
 let groceryLoading = null;
