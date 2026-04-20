@@ -1,11 +1,68 @@
 import { getRecipes, getRecipeByUid, filterRecipes } from './recipes.js';
 import { getAllPreferences } from './preferences.js';
 import { savePlan, loadPlan, loadUseUpItems, saveUseUpItems, loadRepeatWindow, getRestrictions, getWeekStartDay, getSnoozedTags } from './firebase.js';
-import { CONVENIENCE_OPTIONS, getConvenienceLabel, recipeMatchesConvenience } from './convenience.js';
-import { getUserTagDefinitions, recipeMatchesUserTag } from './userTags.js';
+import { CONVENIENCE_OPTIONS, recipeMatchesConvenience } from './convenience.js';
+import { getUserTagDefinitions } from './userTags.js';
 
 const ALL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DIET_TAGS = ['Vegetarian', 'Vegan'];
+
+// Build the full list of tag options shown in the planner's per-day Tags
+// picker. Tag IDs are namespaced so the filter can dispatch to the right
+// predicate (builtin → convenience helper, diet → dietCategories,
+// user → preferences.userTags).
+function buildTagOptions() {
+  const options = [];
+  // Built-in convenience tags (skip the empty "No filter" sentinel)
+  for (const o of CONVENIENCE_OPTIONS) {
+    if (!o.value) continue;
+    options.push({ id: `builtin:${o.value}`, label: o.label, group: 'Convenience' });
+  }
+  // Diet tags
+  for (const d of DIET_TAGS) {
+    options.push({ id: `diet:${d}`, label: d, group: 'Diet' });
+  }
+  // User-defined tags (excluding any that duplicate a diet tag by name)
+  const userDefs = getUserTagDefinitions();
+  for (const t of userDefs) {
+    if (DIET_TAGS.some(d => d.toLowerCase() === t.toLowerCase())) continue;
+    options.push({ id: `user:${t}`, label: t, group: 'Your Tags' });
+  }
+  return options;
+}
+
+// Translate a day's stored filter fields into the unified `tags` array.
+// Handles legacy plans that still carry `convenience` / `userTag` strings.
+function readDayTags(dayData) {
+  if (Array.isArray(dayData.tags)) return dayData.tags.slice();
+  const tags = [];
+  const legacyConv = dayData.convenience || (dayData.makeAhead ? 'make-ahead' : '');
+  if (legacyConv) tags.push(`builtin:${legacyConv}`);
+  if (dayData.userTag) {
+    const isDiet = DIET_TAGS.some(d => d.toLowerCase() === dayData.userTag.toLowerCase());
+    tags.push(`${isDiet ? 'diet' : 'user'}:${dayData.userTag}`);
+  }
+  return tags;
+}
+
+// Does this recipe satisfy a single tag id?
+function recipeMatchesTag(recipe, pref, tagId) {
+  const [kind, ...rest] = tagId.split(':');
+  const value = rest.join(':');
+  if (kind === 'builtin') return recipeMatchesConvenience(recipe, pref, value);
+  if (kind === 'diet') {
+    return (recipe.dietCategories || []).some(d => d.toLowerCase() === value.toLowerCase());
+  }
+  if (kind === 'user') {
+    return (pref?.userTags || []).some(t => t.toLowerCase() === value.toLowerCase());
+  }
+  return true;
+}
+
+export function tagLabel(tagId) {
+  const opt = buildTagOptions().find(o => o.id === tagId);
+  return opt ? opt.label : tagId.split(':').slice(1).join(':');
+}
 
 export function getDAYS() {
   const start = getWeekStartDay(); // 0=Sun, 1=Mon, 6=Sat
@@ -126,11 +183,8 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
     const dayData = plan.days[dayName] || {};
 
     const whoHome = dayData.whoHome || [...plannerMembers];
-
-    // Back-compat: old plans had a boolean makeAhead. Migrate to convenience.
-    const convenience = dayData.convenience || (dayData.makeAhead ? 'make-ahead' : '');
-    const userTagFilter = dayData.userTag || '';
-    const tagDefinitions = [...getUserTagDefinitions(), ...DIET_TAGS.filter(d => !getUserTagDefinitions().some(t => t.toLowerCase() === d.toLowerCase()))];
+    const selectedTags = readDayTags(dayData);
+    const tagOptions = buildTagOptions();
 
     const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
     const selectedRecipe = dayData.recipeUid ? recipes.find(r => r.uid === dayData.recipeUid) : null;
@@ -150,20 +204,7 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
             <label><input type="checkbox" data-member="${escAttr(m)}" ${whoHome.includes(m) ? 'checked' : ''}> ${escHtml(m)}</label>
           `).join('')}
         </div>
-        <label class="convenience-label">
-          Convenience:
-          <select class="convenience-select">
-            ${CONVENIENCE_OPTIONS.map(o => `<option value="${o.value}" ${convenience === o.value ? 'selected' : ''}>${escHtml(o.label)}</option>`).join('')}
-          </select>
-        </label>
-        ${tagDefinitions.length ? `
-        <label class="convenience-label">
-          Tag:
-          <select class="user-tag-select">
-            <option value="">Any</option>
-            ${tagDefinitions.map(t => `<option value="${escAttr(t)}" ${userTagFilter === t ? 'selected' : ''}>${escHtml(t)}</option>`).join('')}
-          </select>
-        </label>` : ''}
+        ${renderTagPicker(tagOptions, selectedTags)}
         <select class="day-status-select">
           <option value="">Cooking</option>
           <option value="skip" ${dayData.skip === true || dayData.skip === 'skip' ? 'selected' : ''}>Skip</option>
@@ -245,12 +286,12 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
       updateViewBtnVisibility();
     };
 
-    dayEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', saveDay));
+    // Who-home checkboxes only (avoid grabbing tag-picker checkboxes here)
+    dayEl.querySelectorAll('.who-home input[type="checkbox"]').forEach(cb => cb.addEventListener('change', saveDay));
     dayEl.querySelector('.day-status-select').addEventListener('change', saveDay);
-    dayEl.querySelector('.convenience-select').addEventListener('change', saveDay);
-    dayEl.querySelector('.user-tag-select')?.addEventListener('change', saveDay);
     dayEl.querySelector('.sides-input').addEventListener('change', saveDay);
     dayEl.querySelector('.servings-select').addEventListener('change', saveDay);
+    setupTagPicker(dayEl, saveDay);
 
     // Searchable combo-box
     setupMealCombo(dayEl, recipes, assignedThisWeek, saveDay);
@@ -260,7 +301,8 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
       const recentUids = await getRecentRecipeUids();
       const assigned = collectAssignedThisWeek(plan, dayName);
       const assignedProteins = collectAssignedProteins(plan, dayName);
-      const result = suggestMealForDay(dayEl, members, recentUids, assigned, assignedProteins, useUpItems);
+      const claimedUseUp = collectClaimedUseUp(plan, dayName, useUpItems);
+      const result = suggestMealForDay(dayEl, members, recentUids, assigned, assignedProteins, useUpItems, claimedUseUp);
       if (result && result.recipe) {
         const suggested = result.recipe;
         setComboValue(dayEl, suggested.uid, suggested.name);
@@ -272,7 +314,7 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
         refreshDropdownMarkers(container, plan, recipes);
         updateAllergenWarnings();
         updateViewBtnVisibility();
-      } else if (result && (result.reason === 'no-convenience-matches' || result.reason === 'no-user-tag-matches')) {
+      } else if (result && result.reason === 'no-tag-matches') {
         // Surface the filter explanation inline on the day
         const errEl = dayEl.querySelector('.suggest-error') || (() => {
           const el = document.createElement('div');
@@ -280,10 +322,8 @@ export async function renderPlanner(container, members, { onViewRecipe } = {}) {
           dayEl.querySelector('.suggest-btn').after(el);
           return el;
         })();
-        const label = result.reason === 'no-user-tag-matches'
-          ? result.userTag
-          : getConvenienceLabel(result.convenience);
-        errEl.textContent = `No recipes match "${label}". Adjust the filter or tag recipes in Recipes \u2192 Preferences.`;
+        const labels = (result.tags || []).map(tagLabel).join(', ');
+        errEl.textContent = `No recipes match the selected tags (${labels}). Loosen the filter or tag recipes in Recipes \u2192 Preferences.`;
         errEl.style.cssText = 'font-size:0.75rem;color:#a05a00;margin-top:0.25rem;';
       }
     });
@@ -551,10 +591,13 @@ function getDayDataFromEl(dayEl, members) {
   dayEl.querySelectorAll('.who-home input[type="checkbox"]').forEach(cb => {
     if (cb.checked) whoHome.push(cb.dataset.member);
   });
+  const tags = [];
+  dayEl.querySelectorAll('.tag-picker-menu input[type="checkbox"]:checked').forEach(cb => {
+    if (cb.value) tags.push(cb.value);
+  });
   return {
     whoHome,
-    convenience: dayEl.querySelector('.convenience-select')?.value || '',
-    userTag: dayEl.querySelector('.user-tag-select')?.value || '',
+    tags,
     skip: dayEl.querySelector('.day-status-select')?.value || false,
     recipeUid: dayEl.querySelector('.meal-combo')?.dataset.recipeUid || '',
     sides: dayEl.querySelector('.sides-input')?.value || '',
@@ -594,9 +637,30 @@ function collectAssignedProteins(plan, excludeDay) {
   return proteins;
 }
 
+// Use-up items already "claimed" by an assigned recipe elsewhere in the week.
+// Once an ingredient appears in an assigned recipe, further matches stop
+// earning the use-up bonus — so a single can of chickpeas doesn't steer the
+// suggester into picking chickpeas every night.
+function collectClaimedUseUp(plan, excludeDay, useUpItems) {
+  const claimed = new Set();
+  if (!useUpItems?.length) return claimed;
+  for (const d of getDAYS()) {
+    if (d === excludeDay) continue;
+    const uid = plan.days[d]?.recipeUid;
+    if (!uid) continue;
+    const r = getRecipeByUid(uid);
+    if (!r) continue;
+    const text = `${r.name} ${r.ingredients || ''}`.toLowerCase();
+    for (const item of useUpItems) {
+      if (text.includes(item.toLowerCase())) claimed.add(item.toLowerCase());
+    }
+  }
+  return claimed;
+}
+
 // === Core suggestion logic for one day ===
 
-function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems = []) {
+function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems = [], useUpClaimed = new Set()) {
   const dayData = getDayDataFromEl(dayEl, members);
   if (dayData.skip === true || dayData.skip === 'skip' || dayData.skip === 'leftovers') return { recipe: null, reason: 'skip' };
 
@@ -604,8 +668,8 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
   const prefs = getAllPreferences();
 
   const scored = [];
-  let filteredByConvenience = 0;
-  let filteredByUserTag = 0;
+  let filteredByTags = 0;
+  const selectedTags = dayData.tags || [];
   const snoozed = getSnoozedTags().map(t => t.toLowerCase());
   for (const recipe of recipes) {
     // Don't repeat within the same week
@@ -623,16 +687,14 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
 
     const recipePref = prefs[recipe.uid] || {};
 
-    // Convenience filter (Slow cooker, Instant Pot, Quick, Make ahead, ...)
-    if (dayData.convenience && !recipeMatchesConvenience(recipe, recipePref, dayData.convenience)) {
-      filteredByConvenience++;
-      continue;
-    }
-
-    // User tag filter (custom labels like BLW, kid favorite, etc. + diet categories)
-    if (dayData.userTag && !recipeMatchesUserTag(recipePref, dayData.userTag, recipe)) {
-      filteredByUserTag++;
-      continue;
+    // Unified tag filter — AND semantics across all selected tags (convenience,
+    // diet, user). An empty selection matches every recipe.
+    if (selectedTags.length) {
+      const allMatch = selectedTags.every(t => recipeMatchesTag(recipe, recipePref, t));
+      if (!allMatch) {
+        filteredByTags++;
+        continue;
+      }
     }
 
     // Skip if anyone home doesn't eat this
@@ -646,12 +708,16 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     // Boost favorited recipes
     if (recipePref.favorite) score += 3;
 
-    // Boost recipes that use ingredients the user wants to use up
+    // Boost recipes that use ingredients the user wants to use up.
+    // Once an ingredient has been claimed by another recipe this week, the
+    // bonus drops to a small nudge so a single "chickpeas" entry doesn't
+    // turn all seven dinners into chickpea recipes.
     if (useUpItems.length > 0) {
       const recipeText = `${recipe.name} ${recipe.ingredients || ''}`.toLowerCase();
       for (const item of useUpItems) {
-        if (recipeText.includes(item.toLowerCase())) {
-          score += 5;
+        const itemLc = item.toLowerCase();
+        if (recipeText.includes(itemLc)) {
+          score += useUpClaimed.has(itemLc) ? 1 : 5;
         }
       }
     }
@@ -677,11 +743,8 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
 
   if (!scored.length) {
     // Distinguish filter-driven empties so the UI can explain why.
-    if (dayData.userTag && filteredByUserTag > 0) {
-      return { recipe: null, reason: 'no-user-tag-matches', userTag: dayData.userTag };
-    }
-    if (dayData.convenience && filteredByConvenience > 0) {
-      return { recipe: null, reason: 'no-convenience-matches', convenience: dayData.convenience };
+    if (selectedTags.length && filteredByTags > 0) {
+      return { recipe: null, reason: 'no-tag-matches', tags: selectedTags };
     }
     return { recipe: null, reason: 'no-matches' };
   }
@@ -704,6 +767,9 @@ export async function suggestAllMeals(container, members) {
   const dayEls = container.querySelectorAll('.planner-day');
   const unfilled = []; // { day, reason }
 
+  // Seed claimed-use-up from days that already have meals assigned.
+  const useUpClaimed = collectClaimedUseUp(plan, null, useUpItems);
+
   // Process days sequentially so each day's pick informs the next
   for (let i = 0; i < dayEls.length; i++) {
     const dayEl = dayEls[i];
@@ -714,12 +780,19 @@ export async function suggestAllMeals(container, members) {
     if (!currentMeal && !isSkip) {
       const assignedThisWeek = collectAssignedThisWeek(plan, dayName);
       const assignedProteins = collectAssignedProteins(plan, dayName);
-      const result = suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems);
+      const result = suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assignedProteins, useUpItems, useUpClaimed);
       if (result && result.recipe) {
         plan.days[dayName] = getDayDataFromEl(dayEl, members);
         plan.days[dayName].recipeUid = result.recipe.uid;
+        // Mark any matched use-up items as claimed so the next day doesn't
+        // re-earn the full bonus for the same ingredient.
+        const picked = result.recipe;
+        const text = `${picked.name} ${picked.ingredients || ''}`.toLowerCase();
+        for (const item of useUpItems) {
+          if (text.includes(item.toLowerCase())) useUpClaimed.add(item.toLowerCase());
+        }
       } else if (result && result.reason && result.reason !== 'skip') {
-        unfilled.push({ day: dayName, reason: result.reason, convenience: result.convenience });
+        unfilled.push({ day: dayName, reason: result.reason, tags: result.tags });
       }
     }
   }
@@ -728,6 +801,100 @@ export async function suggestAllMeals(container, members) {
   plan.updated = Date.now();
   await savePlan(weekKey, plan);
   return { unfilled };
+}
+
+// === Unified tag picker (planner per-day filter) ===
+
+function renderTagPicker(tagOptions, selectedTags) {
+  if (!tagOptions.length) return '';
+  const selectedSet = new Set(selectedTags);
+  const summary = tagPickerSummary(tagOptions, selectedTags);
+
+  // Group options by their `group` label, preserving insertion order
+  const groups = [];
+  const byGroup = new Map();
+  for (const opt of tagOptions) {
+    if (!byGroup.has(opt.group)) {
+      const entry = { label: opt.group, items: [] };
+      byGroup.set(opt.group, entry);
+      groups.push(entry);
+    }
+    byGroup.get(opt.group).items.push(opt);
+  }
+
+  const groupsHtml = groups.map(g => `
+    <div class="tag-picker-group">
+      <div class="tag-picker-group-label">${escHtml(g.label)}</div>
+      ${g.items.map(opt => `
+        <label class="tag-picker-option">
+          <input type="checkbox" value="${escAttr(opt.id)}" ${selectedSet.has(opt.id) ? 'checked' : ''}>
+          <span>${escHtml(opt.label)}</span>
+        </label>
+      `).join('')}
+    </div>
+  `).join('');
+
+  return `
+    <div class="tag-picker" data-open="false">
+      <button type="button" class="tag-picker-btn">Tags: <span class="tag-picker-summary">${escHtml(summary)}</span> <span class="tag-picker-caret">\u25BE</span></button>
+      <div class="tag-picker-menu hidden">${groupsHtml}</div>
+    </div>
+  `;
+}
+
+function tagPickerSummary(tagOptions, selectedTags) {
+  if (!selectedTags.length) return 'Any';
+  if (selectedTags.length === 1) {
+    const opt = tagOptions.find(o => o.id === selectedTags[0]);
+    return opt ? opt.label : selectedTags[0];
+  }
+  return `${selectedTags.length} selected`;
+}
+
+function setupTagPicker(dayEl, onChange) {
+  const picker = dayEl.querySelector('.tag-picker');
+  if (!picker) return;
+  const btn = picker.querySelector('.tag-picker-btn');
+  const menu = picker.querySelector('.tag-picker-menu');
+  const summaryEl = picker.querySelector('.tag-picker-summary');
+
+  const close = () => {
+    picker.dataset.open = 'false';
+    menu.classList.add('hidden');
+  };
+  const open = () => {
+    // Close any other open pickers first
+    document.querySelectorAll('.tag-picker[data-open="true"]').forEach(p => {
+      if (p !== picker) {
+        p.dataset.open = 'false';
+        p.querySelector('.tag-picker-menu')?.classList.add('hidden');
+      }
+    });
+    picker.dataset.open = 'true';
+    menu.classList.remove('hidden');
+  };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (picker.dataset.open === 'true') close();
+    else open();
+  });
+
+  // Stop menu-internal clicks from closing it (but checkbox changes still fire)
+  menu.addEventListener('click', (e) => e.stopPropagation());
+
+  menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const tagOptions = buildTagOptions();
+      const selected = [...menu.querySelectorAll('input[type="checkbox"]:checked')]
+        .map(c => c.value);
+      summaryEl.textContent = tagPickerSummary(tagOptions, selected);
+      onChange();
+    });
+  });
+
+  // Outside click closes
+  document.addEventListener('click', () => close());
 }
 
 function escHtml(str) {

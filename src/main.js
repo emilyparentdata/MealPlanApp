@@ -2,10 +2,10 @@ import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSave
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
 import { initUserTags, getUserTagDefinitions, addUserTagDefinition, removeUserTagDefinition, renameUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
-import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, getDAYS, getCurrentWeekStart, resetWeekStart, getWeekStart } from './planner.js';
+import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, getDAYS, getCurrentWeekStart, resetWeekStart, getWeekStart, tagLabel } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
-import { getConvenienceLabel, getRecipeTotalMinutes, isSlowCooker, isInstantPot } from './convenience.js';
+import { getRecipeTotalMinutes, isSlowCooker, isInstantPot } from './convenience.js';
 import { initTimerWidget } from './timer.js';
 
 // === State ===
@@ -612,15 +612,16 @@ function setupPlannerPage() {
     const result = await suggestAllMeals(document.getElementById('planner-grid'), members);
     refreshPlanner();
 
-    const convBlanks = (result?.unfilled || []).filter(u => u.reason === 'no-convenience-matches');
-    if (convBlanks.length) {
-      // Group by which convenience filter blocked them, so the toast can name each one
+    const tagBlanks = (result?.unfilled || []).filter(u => u.reason === 'no-tag-matches');
+    if (tagBlanks.length) {
+      // Group by which tag combo blocked them, so the toast can name each one
       const byFilter = {};
-      for (const u of convBlanks) {
-        (byFilter[u.convenience] ||= []).push(u.day);
+      for (const u of tagBlanks) {
+        const key = (u.tags || []).join('|');
+        (byFilter[key] ||= { days: [], tags: u.tags || [] }).days.push(u.day);
       }
-      const parts = Object.entries(byFilter).map(([conv, days]) =>
-        `${days.join(', ')} (no recipes match "${getConvenienceLabel(conv)}")`
+      const parts = Object.values(byFilter).map(({ days, tags }) =>
+        `${days.join(', ')} (no recipes match ${tags.map(tagLabel).join(' + ')})`
       );
       showToast(`Left blank: ${parts.join('; ')}. Adjust filters or tag recipes in Recipes → Preferences.`, 9000);
     } else {

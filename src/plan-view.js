@@ -1,7 +1,21 @@
 import { loadCommittedPlan } from './firebase.js';
 import { getRecipeByUid } from './recipes.js';
-import { getWeekKey, getWeekLabel, getDAYS, getWeekStart } from './planner.js';
-import { getConvenienceLabel } from './convenience.js';
+import { getWeekKey, getWeekLabel, getDAYS, getWeekStart, tagLabel } from './planner.js';
+
+// Shape back-compat: newer plans store tags[] (ids like "builtin:quick-20"),
+// older plans had individual `convenience` / `userTag` / `makeAhead` fields.
+function readDayTagsCompat(dayData) {
+  if (Array.isArray(dayData.tags)) return dayData.tags;
+  const tags = [];
+  const legacyConv = dayData.convenience || (dayData.makeAhead ? 'make-ahead' : '');
+  if (legacyConv) tags.push(`builtin:${legacyConv}`);
+  if (dayData.userTag) {
+    const dietNames = ['vegetarian', 'vegan'];
+    const isDiet = dietNames.includes(dayData.userTag.toLowerCase());
+    tags.push(`${isDiet ? 'diet' : 'user'}:${dayData.userTag}`);
+  }
+  return tags;
+}
 
 function isCurrentWeek(weekKey) {
   const start = getWeekStart(new Date());
@@ -70,10 +84,7 @@ export async function renderPlanView(gridContainer, weekLabelEl, weekKeyOverride
       : isLeftovers ? 'Leftovers'
       : (recipe ? recipe.name : 'No meal planned');
 
-    const flags = [];
-    // Back-compat: old plans had a boolean makeAhead field; new plans use convenience.
-    const conv = dayData.convenience || (dayData.makeAhead ? 'make-ahead' : '');
-    if (conv) flags.push(getConvenienceLabel(conv));
+    const flags = readDayTagsCompat(dayData).map(tagLabel);
 
     const sides = dayData.sides ? `<span class="meal-sides">+ ${escHtml(dayData.sides)}</span>` : '';
 

@@ -439,6 +439,20 @@ function parseIngredient(line) {
   // Strip leading "or " (from alternative ingredients like "or avocado")
   s = s.replace(/^or\s+/i, '');
 
+  // Handle shared-noun alternatives: "canned or fresh tomatoes" → "canned
+  // tomatoes", "chicken or vegetable stock" → "chicken stock". Both words
+  // flanking "or" are modifiers of a trailing head noun — stripping after
+  // "or" would otherwise lose the noun entirely.
+  // Only applied when the word before "or" is a known modifier (i.e. not a
+  // complete ingredient on its own), so "soy sauce or tamari" still strips
+  // the alternative instead of mashing the words together.
+  {
+    const SHARED_NOUN_MODIFIER = '(?:canned|fresh|frozen|dried|raw|cooked|ground|whole|cured|smoked|chicken|beef|vegetable|low[\\s-]?sodium|low[\\s-]?fat|full[\\s-]?fat|nonfat|unsweetened|unsalted|salted|mild|hot|sweet|spicy|small|medium|large)';
+    const sharedNounRe = new RegExp(`^(.*?\\b${SHARED_NOUN_MODIFIER})\\s+or\\s+\\w+(\\s+\\w+(?:\\s+\\w+)?)\\s*$`, 'i');
+    const m = s.match(sharedNounRe);
+    if (m) s = (m[1] + m[2]).trim();
+  }
+
   // Handle "zest, then juice, of 1/2 lemon" → "lemon"
   s = s.replace(/^(zest|juice|zest\s*,?\s*then\s*juice|zest\s+and\s+juice|juice\s+and\s+zest)\s*,?\s*(?:of\s+)?/i, '');
 
