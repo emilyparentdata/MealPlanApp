@@ -148,7 +148,9 @@ function detectProtein(recipe) {
 async function getRecentRecipeUids(weeksBack) {
   if (weeksBack === undefined) weeksBack = await loadRepeatWindow();
   if (weeksBack === 0) weeksBack = 52; // "no limit" checks a full year
-  const uids = new Set();
+  // Map of uid -> weeks-ago (smallest if seen in multiple weeks) so the scorer
+  // can decay the penalty: recent repeats hurt more than distant ones.
+  const uids = new Map();
   for (let w = 1; w <= weeksBack; w++) {
     const d = new Date(currentWeekStart);
     d.setDate(d.getDate() - w * 7);
@@ -156,7 +158,8 @@ async function getRecentRecipeUids(weeksBack) {
     const plan = await loadPlan(key);
     if (plan?.days) {
       for (const day of ALL_DAYS) {
-        if (plan.days[day]?.recipeUid) uids.add(plan.days[day].recipeUid);
+        const uid = plan.days[day]?.recipeUid;
+        if (uid && !uids.has(uid)) uids.set(uid, w);
       }
     }
   }
@@ -733,9 +736,14 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     }
     score -= proteinPenalty;
 
-    // Penalize if used in recent weeks (but don't exclude entirely)
-    if (recentUids.has(recipe.uid)) {
-      score -= 2;
+    // Penalize if used in recent weeks, decaying by age. Last week's penalty
+    // must exceed the favorite bonus so favorites don't keep re-winning.
+    const weeksAgo = recentUids.get(recipe.uid);
+    if (weeksAgo !== undefined) {
+      if (weeksAgo === 1) score -= 6;
+      else if (weeksAgo === 2) score -= 4;
+      else if (weeksAgo === 3) score -= 3;
+      else score -= 2;
     }
 
     scored.push({ recipe, score });
@@ -752,7 +760,7 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
   // Sort by score descending, pick randomly from the top tier
   scored.sort((a, b) => b.score - a.score);
   const topScore = scored[0].score;
-  const topTier = scored.filter(s => s.score >= topScore - 1);
+  const topTier = scored.filter(s => s.score >= topScore - 2);
   return { recipe: topTier[Math.floor(Math.random() * topTier.length)].recipe, reason: null };
 }
 
