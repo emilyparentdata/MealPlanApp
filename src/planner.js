@@ -742,7 +742,7 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
       else score -= 2;
     }
 
-    scored.push({ recipe, score, favorite: !!recipePref.favorite });
+    scored.push({ recipe, score });
   }
 
   if (!scored.length) {
@@ -753,15 +753,13 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     return { recipe: null, reason: 'no-matches' };
   }
 
-  // Sort by score descending, pick randomly from the top tier. Favorites act
-  // as a tiebreaker only: if any exist in the tier, restrict the random pick
-  // to favorites; otherwise draw from the full tier.
+  // Sort by score descending, pick randomly from the top tier. Favorite
+  // status doesn't influence selection — it's informational only so
+  // suggestions stay varied.
   scored.sort((a, b) => b.score - a.score);
   const topScore = scored[0].score;
   const topTier = scored.filter(s => s.score >= topScore - 2);
-  const favs = topTier.filter(s => s.favorite);
-  const pool = favs.length ? favs : topTier;
-  return { recipe: pool[Math.floor(Math.random() * pool.length)].recipe, reason: null };
+  return { recipe: topTier[Math.floor(Math.random() * topTier.length)].recipe, reason: null };
 }
 
 // === Suggest full week menu ===
