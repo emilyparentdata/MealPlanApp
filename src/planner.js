@@ -708,9 +708,6 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     // Base score: everyone home can eat it
     let score = dayData.whoHome.length * 2;
 
-    // Boost favorited recipes
-    if (recipePref.favorite) score += 3;
-
     // Boost recipes that use ingredients the user wants to use up.
     // Once an ingredient has been claimed by another recipe this week, the
     // bonus drops to a small nudge so a single "chickpeas" entry doesn't
@@ -736,8 +733,7 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     }
     score -= proteinPenalty;
 
-    // Penalize if used in recent weeks, decaying by age. Last week's penalty
-    // must exceed the favorite bonus so favorites don't keep re-winning.
+    // Penalize if used in recent weeks, decaying by age.
     const weeksAgo = recentUids.get(recipe.uid);
     if (weeksAgo !== undefined) {
       if (weeksAgo === 1) score -= 6;
@@ -746,7 +742,7 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
       else score -= 2;
     }
 
-    scored.push({ recipe, score });
+    scored.push({ recipe, score, favorite: !!recipePref.favorite });
   }
 
   if (!scored.length) {
@@ -757,11 +753,15 @@ function suggestMealForDay(dayEl, members, recentUids, assignedThisWeek, assigne
     return { recipe: null, reason: 'no-matches' };
   }
 
-  // Sort by score descending, pick randomly from the top tier
+  // Sort by score descending, pick randomly from the top tier. Favorites act
+  // as a tiebreaker only: if any exist in the tier, restrict the random pick
+  // to favorites; otherwise draw from the full tier.
   scored.sort((a, b) => b.score - a.score);
   const topScore = scored[0].score;
   const topTier = scored.filter(s => s.score >= topScore - 2);
-  return { recipe: topTier[Math.floor(Math.random() * topTier.length)].recipe, reason: null };
+  const favs = topTier.filter(s => s.favorite);
+  const pool = favs.length ? favs : topTier;
+  return { recipe: pool[Math.floor(Math.random() * pool.length)].recipe, reason: null };
 }
 
 // === Suggest full week menu ===
