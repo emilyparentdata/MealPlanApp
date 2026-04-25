@@ -22,8 +22,14 @@ export function getUserTagDefinitions() {
   return definitions.slice();
 }
 
+// Slug-form so "one pot", "one-pot-meal", and "One Pot Meal" all collapse
+// to the same key. We keep display form as-typed; only equality uses this.
 function normalize(name) {
-  return (name || '').trim().toLowerCase();
+  return (name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 export async function addUserTagDefinition(name) {
@@ -87,6 +93,43 @@ export function recipeHasUserTag(recipeUid, tagName) {
   const norm = normalize(tagName);
   return getRecipeUserTags(recipeUid).some(t => normalize(t) === norm);
 }
+
+// One-way migration: fold a recipe's free-text `categories` into the
+// household tag bank + the recipe's per-user tags, then clear the field.
+// Called from save paths so existing users see their setup gradually
+// consolidate as they touch each recipe. Mutates `recipe` in place.
+export async function migrateRecipeCategoriesToUserTags(recipe) {
+  const cats = recipe?.categories || [];
+  if (!cats.length) return recipe;
+
+  // Add each category to the household definitions (no-op if already present).
+  for (const c of cats) {
+    const trimmed = (c || '').trim();
+    if (trimmed) await addUserTagDefinition(trimmed);
+  }
+
+  // Merge into per-recipe userTags, deduped by slug-form so we don't create
+  // ["Buddha Bowl", "buddha-bowl"] sitting side by side on the recipe.
+  const current = getRecipePrefs(recipe.uid);
+  const existing = (current.userTags || []).slice();
+  const seen = new Set(existing.map(normalize));
+  for (const c of cats) {
+    const trimmed = (c || '').trim();
+    if (!trimmed) continue;
+    const key = normalize(trimmed);
+    if (!seen.has(key)) {
+      existing.push(trimmed);
+      seen.add(key);
+    }
+  }
+  await updateRecipePrefs(recipe.uid, { ...current, userTags: existing });
+
+  recipe.categories = [];
+  return recipe;
+}
+
+// Need addUserTagDefinition reference since the helper above uses it.
+// (Defined above; export already in place.)
 
 // Filter helper used by the planner suggestion logic.
 // Checks user tags on preferences AND dietCategories on the recipe object.

@@ -117,8 +117,9 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
             <p class="tags-edit-hint" style="margin-top:0.75rem">Your tags:</p>
             <div class="user-tags-pills"></div>
             <div class="user-tags-add">
-              <input type="text" class="user-tag-input" placeholder="New tag\u2026" maxlength="40">
+              <input type="text" class="user-tag-input" placeholder="New tag\u2026" maxlength="40" autocomplete="off">
               <button class="user-tag-add-btn" type="button">Add</button>
+              <div class="user-tag-suggestions hidden"></div>
             </div>
           </div>
         </div>
@@ -247,6 +248,37 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
     const pillsEl = tagEditor.querySelector('.user-tags-pills');
     const tagInput = tagEditor.querySelector('.user-tag-input');
     const tagAddBtn = tagEditor.querySelector('.user-tag-add-btn');
+    const suggestionsEl = tagEditor.querySelector('.user-tag-suggestions');
+
+    function renderTagSuggestions() {
+      const raw = tagInput.value.trim();
+      if (!raw) { suggestionsEl.classList.add('hidden'); suggestionsEl.innerHTML = ''; return; }
+      const q = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (!q) { suggestionsEl.classList.add('hidden'); suggestionsEl.innerHTML = ''; return; }
+      const defs = getUserTagDefinitions();
+      const matches = defs.filter(t => {
+        const norm = t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        return norm.includes(q);
+      }).slice(0, 6);
+      if (!matches.length) { suggestionsEl.classList.add('hidden'); suggestionsEl.innerHTML = ''; return; }
+      suggestionsEl.innerHTML = matches.map(t =>
+        `<button type="button" class="user-tag-suggestion" data-tag="${escAttr(t)}">${esc(t)}</button>`
+      ).join('');
+      suggestionsEl.classList.remove('hidden');
+      suggestionsEl.querySelectorAll('.user-tag-suggestion').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const tag = btn.dataset.tag;
+          const newList = await toggleRecipeUserTag(r.uid, tag);
+          preferences[r.uid] = { ...(preferences[r.uid] || {}), userTags: newList };
+          tagInput.value = '';
+          suggestionsEl.classList.add('hidden');
+          suggestionsEl.innerHTML = '';
+          renderTagPills();
+          refreshConvenienceChips();
+        });
+      });
+    }
 
     function renderTagPills() {
       const defs = getUserTagDefinitions();
@@ -293,6 +325,11 @@ export function renderRecipeList(container, recipes, onClick, preferences, callb
       handleAddTag();
     });
     tagInput.addEventListener('click', (e) => e.stopPropagation());
+    tagInput.addEventListener('input', (e) => { e.stopPropagation(); renderTagSuggestions(); });
+    tagInput.addEventListener('blur', () => {
+      // Delay so a click on a suggestion still registers before we hide it.
+      setTimeout(() => { suggestionsEl.classList.add('hidden'); }, 150);
+    });
     tagInput.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') {

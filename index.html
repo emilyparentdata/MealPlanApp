@@ -435,7 +435,10 @@
           <input type="text" id="manage-search" placeholder="Search recipes...">
           <div id="manage-tag-filter" class="manage-tag-filter"></div>
           <div id="manage-recipe-list" class="recipe-grid"></div>
-          <button id="export-all-btn" class="btn" style="margin-top:1rem">Export All Recipes</button>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:1rem">
+            <button id="export-all-btn" class="btn">Export All Recipes</button>
+            <button id="find-duplicates-btn" class="btn">Find Duplicates</button>
+          </div>
         </div>
       </div>
     </section>
@@ -497,6 +500,8 @@
         <label class="settings-label">Manage Tags</label>
         <p class="settings-hint">Rename, merge, or delete your recipe tags. Merging replaces one tag with another across all recipes.</p>
         <div id="manage-tags-list"></div>
+        <button id="migrate-categories-btn" class="btn" style="margin-top:0.75rem">Migrate all recipe categories into tags</button>
+        <p class="settings-hint" style="margin-top:0.25rem">Folds any "from recipe" entries above into your real tag bank in one shot, instead of waiting until you next edit each recipe.</p>
       </div>
     </div>
   </div>
@@ -570,6 +575,17 @@
         <button id="confirm-delete-yes" class="btn" style="background:#e53e3e;color:#fff;">Delete</button>
         <button id="confirm-delete-no" class="btn">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <div id="dupes-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:680px;max-height:85vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+        <h2 style="margin:0">Duplicate Recipes</h2>
+        <button id="dupes-close" class="btn">Close</button>
+      </div>
+      <p style="color:var(--text-light);margin-top:0">Recipes are grouped by name. Pick one to keep — the others will be deleted.</p>
+      <div id="dupes-content"></div>
     </div>
   </div>
 

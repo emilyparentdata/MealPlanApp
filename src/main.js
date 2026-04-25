@@ -1,7 +1,7 @@
 import { initFirebase, getMembers, saveRecipeToFirebase, archiveRecipe, bulkSaveRecipes, savePlan, loadPlan, commitPlan, loadCommittedPlan, onAuthStateChanged, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentUser, loadUserHousehold, createHousehold, joinHousehold, getHouseholdMembers, getHouseholdInfo, loadHouseholdRecipes, loadRepeatWindow, saveRepeatWindow, updateHouseholdMembers, loadRestrictions, getRestrictions, saveRestrictions, loadWeekStartDay, getWeekStartDay, saveWeekStartDay, loadSnoozedTags, getSnoozedTags, saveSnoozedTags, loadUseUpItems, saveUseUpItems } from './firebase.js';
 import { loadRecipes, getRecipes, getRecipeByUid, renderRecipeList, renderRecipeDetail, filterRecipes } from './recipes.js';
 import { initPreferences, getAllPreferences, toggleFavorite, toggleDoesntEat, toggleMakeAhead, toggleSlowCooker, toggleInstantPot, getRecipePrefs, updateRecipePrefs } from './preferences.js';
-import { initUserTags, getUserTagDefinitions, addUserTagDefinition, removeUserTagDefinition, renameUserTagDefinition, toggleRecipeUserTag } from './userTags.js';
+import { initUserTags, getUserTagDefinitions, addUserTagDefinition, removeUserTagDefinition, renameUserTagDefinition, toggleRecipeUserTag, migrateRecipeCategoriesToUserTags } from './userTags.js';
 import { renderPlanner, suggestAllMeals, shiftWeek, setWeek, getWeekLabel, getWeekKey, getDAYS, getCurrentWeekStart, resetWeekStart, getWeekStart, tagLabel } from './planner.js';
 import { renderPlanView } from './plan-view.js';
 import { renderGroceryList, getGroceryText, clearChecked, loadAndRenderExtras, addExtraItem } from './grocery.js';
@@ -14,6 +14,21 @@ const ALLERGENS = ['Dairy', 'Gluten', 'Tree Nuts', 'Peanuts', 'Eggs', 'Soy', 'Sh
 const DIET_CATEGORIES = ['Vegetarian', 'Vegan'];
 let members = [];
 let appInitialized = false;
+
+// Wrap saveRecipeToFirebase to fold any free-text categories into the
+// household tag bank (option C: passive migration on touch). Use this in
+// every save path so categories gradually consolidate as users edit recipes.
+async function saveRecipeWithMigration(recipe) {
+  await migrateRecipeCategoriesToUserTags(recipe);
+  await saveRecipeToFirebase(recipe);
+}
+
+async function bulkSaveRecipesWithMigration(recipes) {
+  for (const r of recipes) {
+    await migrateRecipeCategoriesToUserTags(r);
+  }
+  await bulkSaveRecipes(recipes);
+}
 
 // === Init ===
 async function init() {
@@ -343,6 +358,36 @@ function setupHouseholdSettings() {
     modal.classList.remove('hidden');
   });
 
+  document.getElementById('migrate-categories-btn').addEventListener('click', async () => {
+    const recipes = getRecipes().filter(r => (r.categories || []).length > 0);
+    if (!recipes.length) {
+      showToast('Nothing to migrate — all recipes are already on the new tag system.');
+      return;
+    }
+    if (!confirm(`Move categories on ${recipes.length} recipe${recipes.length === 1 ? '' : 's'} into your tag bank? This can't be undone.`)) return;
+
+    const btn = document.getElementById('migrate-categories-btn');
+    btn.disabled = true;
+    btn.textContent = `Migrating 0 / ${recipes.length}…`;
+
+    let done = 0;
+    for (const r of recipes) {
+      await migrateRecipeCategoriesToUserTags(r);
+      await saveRecipeToFirebase(r);
+      done++;
+      btn.textContent = `Migrating ${done} / ${recipes.length}…`;
+    }
+
+    await loadHouseholdRecipes();
+    await loadRecipes();
+    refreshManageRecipeList();
+    document.dispatchEvent(new CustomEvent('user-tags-changed'));
+    renderManageTags();
+    btn.disabled = false;
+    btn.textContent = 'Migrate all recipe categories into tags';
+    showToast(`Migrated ${done} recipe${done === 1 ? '' : 's'}.`);
+  });
+
   weekStartSelect.addEventListener('change', async () => {
     const newDay = Number(weekStartSelect.value);
     await saveWeekStartDay(newDay);
@@ -447,57 +492,110 @@ function renderManageTags() {
   const recipes = getRecipes();
   const prefs = getAllPreferences();
 
-  if (!defs.length) {
+  // Slug used for matching across defs / userTags / categories.
+  const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+  // Build a unified set of tag rows. Definitions are canonical; any
+  // recipe.categories value not represented in defs shows up as an "orphan"
+  // so the user can rename or delete it from one place.
+  const rows = new Map(); // slugKey -> { display, isOrphan, count, recipesWithCategory: [] }
+
+  for (const t of defs) {
+    rows.set(slug(t), { display: t, isOrphan: false, count: 0, recipesWithCategory: [] });
+  }
+
+  for (const r of recipes) {
+    const tagsOnRecipe = new Set();
+    for (const t of (prefs[r.uid]?.userTags || [])) tagsOnRecipe.add(slug(t));
+    for (const c of (r.categories || [])) tagsOnRecipe.add(slug(c));
+    for (const key of tagsOnRecipe) {
+      if (!key) continue;
+      if (!rows.has(key)) {
+        // Orphan — pick a display form from this recipe's categories.
+        const display = (r.categories || []).find(c => slug(c) === key) || key;
+        rows.set(key, { display, isOrphan: true, count: 0, recipesWithCategory: [] });
+      }
+      rows.get(key).count++;
+    }
+    // Track which recipes have this tag in their categories field (for migration on rename/delete)
+    for (const c of (r.categories || [])) {
+      const key = slug(c);
+      const row = rows.get(key);
+      if (row) row.recipesWithCategory.push({ recipe: r, originalValue: c });
+    }
+  }
+
+  if (!rows.size) {
     container.innerHTML = '<p style="color:var(--text-faint);font-size:0.85rem;">No tags yet.</p>';
     return;
   }
 
-  // Count recipes per tag
-  const counts = {};
-  for (const t of defs) counts[t.toLowerCase()] = 0;
-  for (const r of recipes) {
-    for (const t of (prefs[r.uid]?.userTags || [])) {
-      const key = t.toLowerCase();
-      if (key in counts) counts[key]++;
-    }
-  }
+  const sorted = [...rows.values()].sort((a, b) => a.display.localeCompare(b.display));
+  container.innerHTML = sorted.map(row => {
+    const orphanBadge = row.isOrphan ? '<span class="manage-tag-orphan" title="Lives on recipe categories — rename to fold into your tag bank">from recipe</span>' : '';
+    return `
+      <div class="manage-tag-row" data-tag="${row.display.replace(/"/g, '&quot;')}" data-orphan="${row.isOrphan ? '1' : '0'}">
+        <span class="manage-tag-name">${row.display.replace(/</g, '&lt;')}${orphanBadge}</span>
+        <span class="manage-tag-recipe-count">${row.count} recipe${row.count === 1 ? '' : 's'}</span>
+        <button class="btn manage-tag-rename" title="Rename or merge">Rename</button>
+        <button class="btn manage-tag-delete" title="Delete tag">Delete</button>
+      </div>
+    `;
+  }).join('');
 
-  container.innerHTML = defs.map(t => `
-    <div class="manage-tag-row" data-tag="${t.replace(/"/g, '&quot;')}">
-      <span class="manage-tag-name">${t.replace(/</g, '&lt;')}</span>
-      <span class="manage-tag-recipe-count">${counts[t.toLowerCase()] || 0} recipe${counts[t.toLowerCase()] === 1 ? '' : 's'}</span>
-      <button class="btn manage-tag-rename" title="Rename or merge">Rename</button>
-      <button class="btn manage-tag-delete" title="Delete tag">Delete</button>
-    </div>
-  `).join('');
+  // Helper: clear `oldValue` from a recipe's categories and persist the recipe.
+  async function clearCategoryFromRecipe(recipe, oldValue) {
+    const filtered = (recipe.categories || []).filter(c => c !== oldValue);
+    if (filtered.length === (recipe.categories || []).length) return;
+    recipe.categories = filtered;
+    await saveRecipeToFirebase(recipe);
+  }
 
   container.querySelectorAll('.manage-tag-rename').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const row = btn.closest('.manage-tag-row');
-      const oldName = row.dataset.tag;
+      const tagRow = btn.closest('.manage-tag-row');
+      const oldName = tagRow.dataset.tag;
+      const isOrphan = tagRow.dataset.orphan === '1';
       const newName = prompt(`Rename "${oldName}" to:`, oldName);
       if (!newName || newName.trim() === oldName) return;
       const trimmed = newName.trim();
 
-      // Rename the definition
-      await renameUserTagDefinition(oldName, trimmed);
-
-      // Update all recipes: replace old tag with new tag
-      for (const r of recipes) {
-        const current = prefs[r.uid];
-        if (!current?.userTags) continue;
-        const list = current.userTags.slice();
-        const idx = list.findIndex(t => t.toLowerCase() === oldName.toLowerCase());
-        if (idx < 0) continue;
-        // If new tag already assigned, just remove old; otherwise replace
-        const hasNew = list.some(t => t.toLowerCase() === trimmed.toLowerCase());
-        if (hasNew) {
-          list.splice(idx, 1);
-        } else {
-          list[idx] = trimmed;
-        }
-        await updateRecipePrefs(r.uid, { ...current, userTags: list });
+      // Ensure the new name exists as a definition (handles both rename + orphan-promotion)
+      if (!isOrphan) {
+        await renameUserTagDefinition(oldName, trimmed);
+      } else {
+        await addUserTagDefinition(trimmed);
       }
+
+      // Update all recipes:
+      //   - If the old name was assigned via userTags, swap to the new name.
+      //   - If the old name was on recipe.categories (orphan path), move it
+      //     into userTags under the new name and clear the category entry.
+      for (const r of recipes) {
+        const current = prefs[r.uid] || {};
+        const list = (current.userTags || []).slice();
+        const idx = list.findIndex(t => t.toLowerCase() === oldName.toLowerCase());
+        if (idx >= 0) {
+          const hasNew = list.some(t => t.toLowerCase() === trimmed.toLowerCase());
+          if (hasNew) list.splice(idx, 1); else list[idx] = trimmed;
+          await updateRecipePrefs(r.uid, { ...current, userTags: list });
+        }
+
+        const catMatch = (r.categories || []).find(c => c.toLowerCase() === oldName.toLowerCase());
+        if (catMatch) {
+          // Migrate this category into userTags under the new name, clear category.
+          const fresh = getRecipePrefs(r.uid);
+          const merged = (fresh.userTags || []).slice();
+          if (!merged.some(t => t.toLowerCase() === trimmed.toLowerCase())) merged.push(trimmed);
+          await updateRecipePrefs(r.uid, { ...fresh, userTags: merged });
+          await clearCategoryFromRecipe(r, catMatch);
+        }
+      }
+
+      // Reload recipes since we mutated some categories fields on disk.
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      refreshManageRecipeList();
 
       document.dispatchEvent(new CustomEvent('user-tags-changed'));
       renderManageTags();
@@ -507,22 +605,33 @@ function renderManageTags() {
 
   container.querySelectorAll('.manage-tag-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const row = btn.closest('.manage-tag-row');
-      const tagName = row.dataset.tag;
-      const count = counts[tagName.toLowerCase()] || 0;
+      const tagRow = btn.closest('.manage-tag-row');
+      const tagName = tagRow.dataset.tag;
+      const isOrphan = tagRow.dataset.orphan === '1';
+      const count = sorted.find(row => row.display === tagName)?.count || 0;
       if (!confirm(`Delete tag "${tagName}"? It will be removed from ${count} recipe${count === 1 ? '' : 's'}.`)) return;
 
-      await removeUserTagDefinition(tagName);
+      if (!isOrphan) {
+        await removeUserTagDefinition(tagName);
+      }
 
-      // Remove from all recipes
+      // Remove from userTags on all recipes
       for (const r of recipes) {
         const current = prefs[r.uid];
-        if (!current?.userTags) continue;
-        const list = current.userTags.filter(t => t.toLowerCase() !== tagName.toLowerCase());
-        if (list.length !== current.userTags.length) {
-          await updateRecipePrefs(r.uid, { ...current, userTags: list });
+        if (current?.userTags) {
+          const list = current.userTags.filter(t => t.toLowerCase() !== tagName.toLowerCase());
+          if (list.length !== current.userTags.length) {
+            await updateRecipePrefs(r.uid, { ...current, userTags: list });
+          }
         }
+        // Also remove from recipe.categories if present (covers orphans + dual-stored)
+        const catMatch = (r.categories || []).find(c => c.toLowerCase() === tagName.toLowerCase());
+        if (catMatch) await clearCategoryFromRecipe(r, catMatch);
       }
+
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      refreshManageRecipeList();
 
       document.dispatchEvent(new CustomEvent('user-tags-changed'));
       renderManageTags();
@@ -1179,7 +1288,7 @@ async function setupStarterPacksOnManage() {
     btn.textContent = 'Adding...';
     btn.disabled = true;
     try {
-      await bulkSaveRecipes(recipes);
+      await bulkSaveRecipesWithMigration(recipes);
       await loadHouseholdRecipes();
       await loadRecipes();
       showToast(`Added ${recipes.length} starter recipes!`);
@@ -1229,6 +1338,18 @@ function setupManagePage() {
   // Starter recipe packs
   setupStarterPacksOnManage();
 
+  // Typeahead on the manual-add Categories field
+  attachCategoriesTypeahead('new-recipe-categories');
+
+  // Find Duplicates
+  document.getElementById('find-duplicates-btn').addEventListener('click', openDuplicatesModal);
+  document.getElementById('dupes-close').addEventListener('click', () => {
+    document.getElementById('dupes-modal').classList.add('hidden');
+  });
+  document.getElementById('dupes-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+  });
+
   // Single recipe add
   document.getElementById('save-recipe-btn').addEventListener('click', async () => {
     const name = document.getElementById('new-recipe-name').value.trim();
@@ -1256,7 +1377,7 @@ function setupManagePage() {
       image_url: '',
     };
 
-    await saveRecipeToFirebase(recipe);
+    await saveRecipeWithMigration(recipe);
     await loadHouseholdRecipes();
     await loadRecipes();
     refreshManageRecipeList();
@@ -1327,7 +1448,7 @@ function setupManagePage() {
     btn.disabled = true;
 
     try {
-      await bulkSaveRecipes(pendingImport);
+      await bulkSaveRecipesWithMigration(pendingImport);
       await loadHouseholdRecipes();
       await loadRecipes();
       showToast(`Imported ${pendingImport.length} recipes!`);
@@ -1465,7 +1586,7 @@ function setupUrlImport() {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     try {
-      await saveRecipeToFirebase(pendingUrlRecipe);
+      await saveRecipeWithMigration(pendingUrlRecipe);
       await loadHouseholdRecipes();
       await loadRecipes();
       refreshManageRecipeList();
@@ -1567,7 +1688,7 @@ function setupPasteImport() {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     try {
-      await saveRecipeToFirebase(pendingPasteRecipe);
+      await saveRecipeWithMigration(pendingPasteRecipe);
       await loadHouseholdRecipes();
       await loadRecipes();
       refreshManageRecipeList();
@@ -1673,7 +1794,12 @@ function setupSharedPacks() {
     `;
 
     previewContent.querySelector('.shared-select-all').addEventListener('click', () => {
-      selectedImportUids = new Set(loadedPack.recipes.map((_, i) => i));
+      // Skip dupes by default so re-importing a pack doesn't silently duplicate.
+      selectedImportUids = new Set(
+        loadedPack.recipes
+          .map((r, i) => existingNames.has(r.name.trim().toLowerCase()) ? -1 : i)
+          .filter(i => i >= 0)
+      );
       renderImportPreview();
     });
     previewContent.querySelector('.shared-select-none').addEventListener('click', () => {
@@ -1757,7 +1883,7 @@ function setupSharedPacks() {
       ...r,
       uid: 'shared_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     }));
-    await bulkSaveRecipes(recipes);
+    await bulkSaveRecipesWithMigration(recipes);
 
     // Apply bulk tags if specified
     const tagInput = document.getElementById('shared-import-tag-input');
@@ -2211,7 +2337,7 @@ function setupScanImport() {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     try {
-      await saveRecipeToFirebase(pendingScanRecipe);
+      await saveRecipeWithMigration(pendingScanRecipe);
       await loadHouseholdRecipes();
       await loadRecipes();
       refreshManageRecipeList();
@@ -2231,6 +2357,11 @@ function setupScanImport() {
     document.getElementById('new-recipe-name').value = pendingScanRecipe.name || '';
     document.getElementById('new-recipe-ingredients').value = pendingScanRecipe.ingredients || '';
     document.getElementById('new-recipe-directions').value = pendingScanRecipe.directions || '';
+    document.getElementById('new-recipe-servings').value = pendingScanRecipe.servings || '';
+    document.getElementById('new-recipe-prep').value = pendingScanRecipe.prep_time || '';
+    document.getElementById('new-recipe-cook').value = pendingScanRecipe.cook_time || '';
+    document.getElementById('new-recipe-categories').value = (pendingScanRecipe.categories || []).join(', ');
+    document.getElementById('new-recipe-source').value = pendingScanRecipe.source || '';
     document.getElementById('new-recipe-notes').value = pendingScanRecipe.notes || '';
     resetScan();
     // Switch to manual tab
@@ -2254,7 +2385,7 @@ function setupScanImport() {
     btn.textContent = 'Saving...';
 
     for (const recipe of toSave) {
-      await saveRecipeToFirebase(recipe);
+      await saveRecipeWithMigration(recipe);
     }
 
     await loadHouseholdRecipes();
@@ -2783,6 +2914,168 @@ function escAttr(str) {
 let currentDetailRecipe = null;
 let currentEditRecipe = null;
 
+// Attach a typeahead dropdown to a comma-separated tag/category input.
+// Suggests from existing user-tag definitions plus categories already used
+// on other recipes, deduped by slug-form so "Buddha Bowl" / "buddha bowl"
+// collapse to one suggestion.
+function attachCategoriesTypeahead(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input || input.dataset.typeaheadAttached) return;
+  input.dataset.typeaheadAttached = '1';
+  input.setAttribute('autocomplete', 'off');
+
+  const suggestions = document.createElement('div');
+  suggestions.className = 'category-typeahead hidden';
+  input.parentElement.style.position = input.parentElement.style.position || 'relative';
+  input.insertAdjacentElement('afterend', suggestions);
+
+  const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+  function getCurrentToken() {
+    const value = input.value;
+    const lastComma = value.lastIndexOf(',');
+    const start = lastComma + 1;
+    const token = value.slice(start);
+    return { start, token, leadingSpace: token.startsWith(' ') ? '' : ' ' };
+  }
+
+  function pickSuggestion(choice) {
+    const { start } = getCurrentToken();
+    const before = input.value.slice(0, start);
+    const prefix = before.trim().length ? (before.endsWith(' ') ? before : before + ' ') : '';
+    input.value = prefix + choice + ', ';
+    input.focus();
+    suggestions.classList.add('hidden');
+    suggestions.innerHTML = '';
+  }
+
+  function render() {
+    const { token } = getCurrentToken();
+    const q = slug(token);
+    if (!q) { suggestions.classList.add('hidden'); suggestions.innerHTML = ''; return; }
+
+    const existingTokens = new Set(
+      input.value.split(',').map(t => slug(t)).filter(Boolean)
+    );
+
+    const pool = new Map();
+    for (const t of getUserTagDefinitions()) {
+      const s = slug(t);
+      if (s && !pool.has(s)) pool.set(s, t);
+    }
+    for (const r of getRecipes()) {
+      for (const c of (r.categories || [])) {
+        const s = slug(c);
+        if (s && !pool.has(s)) pool.set(s, c);
+      }
+    }
+
+    const matches = [...pool.entries()]
+      .filter(([s]) => s.includes(q) && s !== q && !existingTokens.has(s))
+      .slice(0, 8)
+      .map(([, display]) => display);
+
+    if (!matches.length) { suggestions.classList.add('hidden'); suggestions.innerHTML = ''; return; }
+    suggestions.innerHTML = matches.map(m =>
+      `<button type="button" class="category-typeahead-item" data-val="${escAttr(m)}">${escManage(m)}</button>`
+    ).join('');
+    suggestions.classList.remove('hidden');
+    suggestions.querySelectorAll('.category-typeahead-item').forEach(btn => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        pickSuggestion(btn.dataset.val);
+      });
+    });
+  }
+
+  input.addEventListener('input', render);
+  input.addEventListener('focus', render);
+  input.addEventListener('blur', () => {
+    setTimeout(() => { suggestions.classList.add('hidden'); }, 150);
+  });
+}
+
+function findDuplicateClusters() {
+  const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const groups = new Map();
+  for (const r of getRecipes()) {
+    const key = norm(r.name);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  return [...groups.values()].filter(g => g.length > 1);
+}
+
+function renderDuplicatesModal() {
+  const container = document.getElementById('dupes-content');
+  const clusters = findDuplicateClusters();
+  if (!clusters.length) {
+    container.innerHTML = '<p style="color:var(--text-light)">No duplicate titles found.</p>';
+    return;
+  }
+  const prefs = getAllPreferences();
+  container.innerHTML = clusters.map((group, gi) => {
+    const items = group.map((r, ri) => {
+      const meta = [
+        r.prep_time ? `Prep: ${escManage(r.prep_time)}` : '',
+        r.cook_time ? `Cook: ${escManage(r.cook_time)}` : '',
+        r.servings ? `Serves: ${escManage(r.servings)}` : '',
+      ].filter(Boolean).join(' · ');
+      const fav = prefs[r.uid]?.favorite ? ' <span style="color:#c0392b">❤</span>' : '';
+      const ingPreview = (r.ingredients || '').split('\n').slice(0, 3).join(' · ').slice(0, 140);
+      return `
+        <label class="dupe-row">
+          <input type="radio" name="dupe-keep-${gi}" value="${escAttr(r.uid)}" ${ri === 0 ? 'checked' : ''}>
+          <div class="dupe-row-body">
+            <div><strong>${escManage(r.name)}</strong>${fav}</div>
+            ${meta ? `<div class="dupe-meta">${meta}</div>` : ''}
+            ${ingPreview ? `<div class="dupe-meta" style="font-style:italic">${escManage(ingPreview)}…</div>` : ''}
+            ${r.source ? `<div class="dupe-meta">Source: ${escManage(r.source)}</div>` : ''}
+          </div>
+        </label>
+      `;
+    }).join('');
+    return `
+      <div class="dupe-cluster" data-cluster="${gi}">
+        <div class="dupe-cluster-header">${escManage(group[0].name)} <span style="color:var(--text-light)">(${group.length} copies)</span></div>
+        ${items}
+        <div class="dupe-cluster-actions">
+          <button class="btn dupe-merge-btn" data-cluster="${gi}">Keep selected, delete others</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.dupe-merge-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const gi = parseInt(btn.dataset.cluster);
+      const group = clusters[gi];
+      const keepUid = container.querySelector(`input[name="dupe-keep-${gi}"]:checked`)?.value;
+      if (!keepUid) { showToast('Pick which copy to keep.'); return; }
+      const toDelete = group.filter(r => r.uid !== keepUid);
+      if (!toDelete.length) return;
+      const ok = confirm(`Delete ${toDelete.length} duplicate${toDelete.length === 1 ? '' : 's'} of "${group[0].name}"?`);
+      if (!ok) return;
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+      for (const r of toDelete) {
+        await archiveRecipe(r.uid);
+      }
+      await loadHouseholdRecipes();
+      await loadRecipes();
+      refreshManageRecipeList();
+      showToast(`Deleted ${toDelete.length} duplicate${toDelete.length === 1 ? '' : 's'}.`);
+      renderDuplicatesModal();
+    });
+  });
+}
+
+function openDuplicatesModal() {
+  document.getElementById('dupes-modal').classList.remove('hidden');
+  renderDuplicatesModal();
+}
+
 function setupEditModal() {
   // Close buttons
   document.querySelector('.edit-modal-close').addEventListener('click', closeEditModal);
@@ -2790,6 +3083,9 @@ function setupEditModal() {
     if (e.target === e.currentTarget) closeEditModal();
   });
   document.getElementById('cancel-edit-btn').addEventListener('click', closeEditModal);
+
+  // Typeahead on the edit Categories field
+  attachCategoriesTypeahead('edit-recipe-categories');
 
   // Save
   document.getElementById('save-edit-btn').addEventListener('click', async () => {
@@ -2806,6 +3102,16 @@ function setupEditModal() {
     const dietCategories = [...document.querySelectorAll('#edit-recipe-diet .allergen-toggle.active')]
       .map(btn => btn.dataset.diet);
 
+    // Migrate anything in the Categories field into the household tag bank
+    // and into this edit's working tag set, then save with empty categories.
+    // This is the same passive migration used by every other save path.
+    const enteredCategories = document.getElementById('edit-recipe-categories').value
+      .split(',').map(s => s.trim()).filter(Boolean);
+    for (const c of enteredCategories) {
+      await addUserTagDefinition(c);
+      editModalUserTags.add(c.toLowerCase());
+    }
+
     const updated = {
       ...currentEditRecipe,
       name,
@@ -2814,8 +3120,7 @@ function setupEditModal() {
       servings: document.getElementById('edit-recipe-servings').value,
       prep_time: document.getElementById('edit-recipe-prep').value,
       cook_time: document.getElementById('edit-recipe-cook').value,
-      categories: document.getElementById('edit-recipe-categories').value
-        .split(',').map(s => s.trim()).filter(Boolean),
+      categories: [],
       source: document.getElementById('edit-recipe-source').value,
       notes: document.getElementById('edit-recipe-notes').value,
       allergens,
