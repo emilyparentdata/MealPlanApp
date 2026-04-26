@@ -458,7 +458,9 @@ function parseIngredient(line) {
 
   // Strip prep words and parenthetical notes
   let name = s
-    .replace(/\(.*?\)/g, '')       // remove parenthetical notes
+    .replace(/\(.*?\)/g, '')       // remove balanced parenthetical notes
+    .replace(/\s*\([^)]*$/, '')    // strip unbalanced "(... end-of-line" (parenthetical wrapped to next line in source)
+    .replace(/^[^(]*\)\s*/, '')    // and the matching "...)" prefix on the continuation line
     .replace(PREP_WORDS, '')       // remove prep descriptors
     .replace(/,?\s*for\s+(serving|garnish|topping|dipping|drizzling)s?/i, '')  // "for serving" etc. (anywhere, not just end)
     .replace(/,?\s*and\s+more\s+for\s+.*$/i, '')  // "and more for serving"
@@ -505,8 +507,16 @@ function normalizeKey(key) {
   // "yellow onions" / "white onions" / "sweet onions" → "onions" (but not "green onion")
   key = key.replace(/\b(yellow|white|sweet|red|vidalia|spanish)\s+onions?\b/, 'onion');
 
-  // Collapse trailing "s" plurals for common produce
-  key = key.replace(/\bonions\b/, 'onion').replace(/\bpotatoes\b/, 'potato').replace(/\btomatoes\b/, 'tomato');
+  // Collapse trailing "s" plurals for common produce so a recipe asking for
+  // "3 bell peppers" merges with another asking for "1 bell pepper".
+  const PLURALS = [
+    ['onions', 'onion'], ['potatoes', 'potato'], ['tomatoes', 'tomato'],
+    ['peppers', 'pepper'], ['carrots', 'carrot'], ['cucumbers', 'cucumber'],
+    ['zucchinis', 'zucchini'], ['mushrooms', 'mushroom'],
+  ];
+  for (const [plural, singular] of PLURALS) {
+    key = key.replace(new RegExp(`\\b${plural}\\b`), singular);
+  }
 
   // "flat leaf parsley" / "flat-leaf parsley" / "italian parsley" → "parsley"
   key = key.replace(/\b(flat[\s-]?leaf|italian|curly)\s+parsley\b/, 'parsley');
@@ -782,7 +792,7 @@ function categorizeIngredient(ing) {
     if (lower.includes(phrase)) return cat;
   }
 
-  const meatWords = ['chicken', 'beef', 'pork', 'sausage', 'salmon', 'fish', 'bacon', 'turkey', 'shrimp', 'cod', 'tilapia', 'hot dog', 'meatball', 'ground beef', 'stew meat', 'pepperoni', 'ham', 'steak', 'tofu', 'tempeh', 'seitan', 'lamb', 'veal', 'brisket', 'ribs', 'flank', 'sirloin', 'tenderloin', 'mahi', 'halibut', 'tuna', 'crab', 'lobster', 'scallop', 'clam', 'mussel', 'anchov', 'prosciutto', 'chorizo', 'bratwurst', 'kielbasa'];
+  const meatWords = ['chicken', 'beef', 'pork', 'sausage', 'salmon', 'fish', 'bacon', 'turkey', 'shrimp', 'cod', 'tilapia', 'hot dog', 'meatball', 'ground beef', 'ground meat', 'stew meat', 'pepperoni', 'ham', 'steak', 'tofu', 'tempeh', 'seitan', 'lamb', 'veal', 'brisket', 'ribs', 'flank', 'sirloin', 'tenderloin', 'mahi', 'halibut', 'tuna', 'crab', 'lobster', 'scallop', 'clam', 'mussel', 'anchov', 'prosciutto', 'chorizo', 'bratwurst', 'kielbasa'];
   const dairyWords = ['cheese', 'milk', 'butter', 'cream', 'egg', 'eggs', 'yogurt', 'sour cream', 'mozzarella', 'parmesan', 'cheddar', 'gruyere', 'ricotta', 'fontina', 'provolone', 'pecorino', 'romano'];
   const produceWords = ['lettuce', 'tomato', 'onion', 'garlic', 'pepper', 'broccoli', 'broccolini', 'carrot', 'celery', 'spinach', 'basil', 'cilantro', 'parsley', 'lime', 'lemon', 'avocado', 'potato', 'mushroom', 'corn', 'peas', 'snap pea', 'green onion', 'ginger', 'romaine', 'cherry tomato', 'bell pepper', 'jalape', 'zucchini', 'cucumber', 'cabbage', 'kale', 'arugula', 'scallion', 'shallot', 'sweet potato', 'asparagus', 'coleslaw', 'chive', 'cauliflower', 'fennel', 'radish', 'turnip', 'beet', 'bok choy', 'watercress', 'endive', 'leek'];
   const spiceWords = ['cumin', 'paprika', 'thyme', 'oregano', 'cinnamon', 'seasoning', 'spice', 'taco seasoning', 'chili powder', 'italian seasoning', 'garam masala', 'turmeric', 'cayenne', 'bay leaves', 'nutmeg', 'coriander', 'cardamom', 'cloves', 'allspice', 'curry powder', 'red pepper flake', 'smoked paprika', 'dried basil', 'dried parsley', 'rosemary', 'dill'];
