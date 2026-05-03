@@ -1,15 +1,60 @@
-import { loadCommittedPlan, loadGroceryExtras, saveGroceryExtras } from './firebase.js';
+import {
+  loadCommittedPlan, loadGroceryExtras, saveGroceryExtras,
+  loadGroceryListState, saveGroceryListState,
+  loadGroceryExtrasChecked, saveGroceryExtrasChecked,
+  loadCategoryOverrides, getCachedCategoryOverrides, saveCategoryOverrides,
+} from './firebase.js';
 import { getRecipeByUid } from './recipes.js';
 import { getWeekKey, getWeekLabel, getDAYS } from './planner.js';
 
 let lastMeals = null;
 let currentWeekKey = null;
 
+// Cached grocery list state for the currently rendered week. Loaded from
+// Firestore (or localStorage fallback) at the top of renderGroceryList,
+// mutated in place by the click handlers, and persisted via a debounced
+// write. Keeping the cache in module scope means handlers stay synchronous.
+let listState = { checked: {}, edits: {}, deletes: {} };
+let extrasChecked = {};
+
+let listStateSaveTimer = null;
+function scheduleListStateSave() {
+  if (listStateSaveTimer) clearTimeout(listStateSaveTimer);
+  const weekKey = currentWeekKey;
+  const snapshot = {
+    checked: { ...listState.checked },
+    edits: { ...listState.edits },
+    deletes: { ...listState.deletes },
+  };
+  listStateSaveTimer = setTimeout(() => {
+    listStateSaveTimer = null;
+    saveGroceryListState(weekKey, snapshot).catch(err =>
+      console.warn('Failed to save grocery list state:', err));
+  }, 300);
+}
+
+let extrasCheckedSaveTimer = null;
+function scheduleExtrasCheckedSave() {
+  if (extrasCheckedSaveTimer) clearTimeout(extrasCheckedSaveTimer);
+  const weekKey = currentWeekKey;
+  const snapshot = { ...extrasChecked };
+  extrasCheckedSaveTimer = setTimeout(() => {
+    extrasCheckedSaveTimer = null;
+    saveGroceryExtrasChecked(weekKey, snapshot).catch(err =>
+      console.warn('Failed to save extras checked state:', err));
+  }, 300);
+}
+
 export async function renderGroceryList(checklistContainer, breakdownContainer, weekLabelEl) {
   currentWeekKey = getWeekKey();
   weekLabelEl.textContent = getWeekLabel();
 
-  const plan = await loadCommittedPlan(currentWeekKey);
+  const [plan, loadedState] = await Promise.all([
+    loadCommittedPlan(currentWeekKey),
+    loadGroceryListState(currentWeekKey),
+    loadCategoryOverrides(),
+  ]);
+  listState = loadedState;
   checklistContainer.innerHTML = '';
   breakdownContainer.innerHTML = '';
   lastMeals = null;
@@ -62,12 +107,9 @@ export async function renderGroceryList(checklistContainer, breakdownContainer, 
 
 function renderChecklist(container, meals) {
   const groups = aggregateIngredients(meals);
-  const storageKey = `grocery_checked_${currentWeekKey}`;
-  const checked = JSON.parse(localStorage.getItem(storageKey) || '{}');
-  const editsKey = `grocery_edits_${currentWeekKey}`;
-  const edits = JSON.parse(localStorage.getItem(editsKey) || '{}');
-  const deletesKey = `grocery_deletes_${currentWeekKey}`;
-  const deletes = JSON.parse(localStorage.getItem(deletesKey) || '{}');
+  const checked = listState.checked;
+  const edits = listState.edits;
+  const deletes = listState.deletes;
 
   const CATEGORY_KEYS = { 'Produce': 'produce', 'Meat & Seafood': 'meat', 'Dairy & Eggs': 'dairy', 'Pantry': 'pantry', 'Spices & Seasonings': 'spices', 'Other': 'other' };
   const CATEGORY_OPTIONS = [
@@ -113,9 +155,9 @@ function renderChecklist(container, meals) {
   // Wire up checkboxes — re-render so checked items sink to the bottom.
   container.querySelectorAll('.grocery-check input').forEach(cb => {
     cb.addEventListener('change', () => {
-      const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      if (cb.checked) { state[cb.dataset.key] = true; } else { delete state[cb.dataset.key]; }
-      localStorage.setItem(storageKey, JSON.stringify(state));
+      if (cb.checked) { listState.checked[cb.dataset.key] = true; }
+      else { delete listState.checked[cb.dataset.key]; }
+      scheduleListStateSave();
       renderChecklist(container, meals);
     });
   });
@@ -142,9 +184,8 @@ function renderChecklist(container, meals) {
       const save = () => {
         const newText = input.value.trim();
         if (newText && newText !== currentText) {
-          const allEdits = JSON.parse(localStorage.getItem(editsKey) || '{}');
-          allEdits[key] = newText;
-          localStorage.setItem(editsKey, JSON.stringify(allEdits));
+          listState.edits[key] = newText;
+          scheduleListStateSave();
         }
         renderChecklist(container, meals);
       };
@@ -161,9 +202,8 @@ function renderChecklist(container, meals) {
   container.querySelectorAll('.grocery-delete-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const allDeletes = JSON.parse(localStorage.getItem(deletesKey) || '{}');
-      allDeletes[btn.dataset.key] = true;
-      localStorage.setItem(deletesKey, JSON.stringify(allDeletes));
+      listState.deletes[btn.dataset.key] = true;
+      scheduleListStateSave();
       renderChecklist(container, meals);
     });
   });
@@ -837,16 +877,17 @@ function categorizeIngredient(ing) {
 }
 
 // === Category overrides (persist across weeks) ===
-const CATEGORY_OVERRIDES_KEY = 'grocery_category_overrides';
+// Loaded into the firebase.js cache by loadCategoryOverrides() in
+// renderGroceryList; reads stay synchronous via getCachedCategoryOverrides().
 
 function getCategoryOverrides() {
-  return JSON.parse(localStorage.getItem(CATEGORY_OVERRIDES_KEY) || '{}');
+  return getCachedCategoryOverrides();
 }
 
 function saveCategoryOverride(ingredientKey, category) {
-  const overrides = getCategoryOverrides();
-  overrides[ingredientKey] = category;
-  localStorage.setItem(CATEGORY_OVERRIDES_KEY, JSON.stringify(overrides));
+  const overrides = { ...getCachedCategoryOverrides(), [ingredientKey]: category };
+  saveCategoryOverrides(overrides).catch(err =>
+    console.warn('Failed to save category override:', err));
 }
 
 // Inline picker for moving an item to a different category section.
@@ -932,12 +973,9 @@ function buildGroceryText(meals) {
   // Grocery list (respect edits, deletes, and checks)
   // Checked items are treated as "I already have this" and excluded
   // from the copied output, matching how deletes already work.
-  const editsKey = `grocery_edits_${currentWeekKey}`;
-  const edits = JSON.parse(localStorage.getItem(editsKey) || '{}');
-  const deletesKey = `grocery_deletes_${currentWeekKey}`;
-  const deletes = JSON.parse(localStorage.getItem(deletesKey) || '{}');
-  const checkedKey = `grocery_checked_${currentWeekKey}`;
-  const checked = JSON.parse(localStorage.getItem(checkedKey) || '{}');
+  const edits = listState.edits;
+  const deletes = listState.deletes;
+  const checked = listState.checked;
 
   lines.push('GROCERY LIST');
   lines.push('-'.repeat(30));
@@ -955,8 +993,6 @@ function buildGroceryText(meals) {
 
   // Extra items (also exclude checked)
   if (extraItems.length) {
-    const extrasCheckedKey = currentWeekKey ? `grocery_extras_checked_${currentWeekKey}` : 'grocery_extras_checked';
-    const extrasChecked = JSON.parse(localStorage.getItem(extrasCheckedKey) || '{}');
     const visibleExtras = extraItems.filter((_, idx) => !extrasChecked[idx]);
     if (visibleExtras.length) {
       lines.push('');
@@ -990,7 +1026,8 @@ export function getPlanSummary() {
 
 export function clearChecked() {
   if (!currentWeekKey) return;
-  localStorage.removeItem(`grocery_checked_${currentWeekKey}`);
+  listState.checked = {};
+  scheduleListStateSave();
 }
 
 // === Extra grocery items ===
@@ -998,22 +1035,27 @@ export function clearChecked() {
 let extraItems = [];
 
 export async function loadAndRenderExtras(container) {
-  extraItems = await loadGroceryExtras();
+  // Set the week key here too — refreshGrocery in main.js calls this before
+  // renderGroceryList, so currentWeekKey could otherwise be stale/null.
+  currentWeekKey = getWeekKey();
+  const [items, checked] = await Promise.all([
+    loadGroceryExtras(),
+    loadGroceryExtrasChecked(currentWeekKey),
+  ]);
+  extraItems = items;
+  extrasChecked = checked;
   renderExtras(container);
 }
 
 function renderExtras(container) {
-  const storageKey = currentWeekKey ? `grocery_extras_checked_${currentWeekKey}` : 'grocery_extras_checked';
-  const checked = JSON.parse(localStorage.getItem(storageKey) || '{}');
-
   if (!extraItems.length) {
     container.innerHTML = '<p class="grocery-extras-empty">No extra items yet. Add staples like eggs, milk, or bread.</p>';
     return;
   }
 
   container.innerHTML = `<ul class="grocery-checklist-items">${extraItems.map((item, idx) => {
-    const isChecked = checked[idx] ? 'checked' : '';
-    const checkedClass = checked[idx] ? ' checked' : '';
+    const isChecked = extrasChecked[idx] ? 'checked' : '';
+    const checkedClass = extrasChecked[idx] ? ' checked' : '';
     return `<li>
       <label class="grocery-check${checkedClass}">
         <input type="checkbox" data-extra-idx="${idx}" ${isChecked}>
@@ -1027,9 +1069,9 @@ function renderExtras(container) {
   container.querySelectorAll('.grocery-check input').forEach(cb => {
     cb.addEventListener('change', () => {
       cb.closest('label').classList.toggle('checked', cb.checked);
-      const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      if (cb.checked) { state[cb.dataset.extraIdx] = true; } else { delete state[cb.dataset.extraIdx]; }
-      localStorage.setItem(storageKey, JSON.stringify(state));
+      if (cb.checked) { extrasChecked[cb.dataset.extraIdx] = true; }
+      else { delete extrasChecked[cb.dataset.extraIdx]; }
+      scheduleExtrasCheckedSave();
     });
   });
 

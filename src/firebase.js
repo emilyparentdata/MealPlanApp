@@ -491,6 +491,128 @@ export async function saveGroceryExtras(items) {
   await col('settings').doc('groceryExtras').set({ items });
 }
 
+// === Grocery List State (per-week checked/edits/deletes) ===
+//
+// One Firestore doc per week so a user editing the list on their laptop
+// sees the same list when they open it on their phone. Falls back to
+// localStorage when offline/signed-out, and on first sync migrates any
+// existing localStorage state up to Firestore so users don't lose work.
+
+function readListStateFromLocal(weekKey) {
+  return {
+    checked: JSON.parse(localStorage.getItem(`grocery_checked_${weekKey}`) || '{}'),
+    edits: JSON.parse(localStorage.getItem(`grocery_edits_${weekKey}`) || '{}'),
+    deletes: JSON.parse(localStorage.getItem(`grocery_deletes_${weekKey}`) || '{}'),
+  };
+}
+
+function writeListStateToLocal(weekKey, state) {
+  localStorage.setItem(`grocery_checked_${weekKey}`, JSON.stringify(state.checked || {}));
+  localStorage.setItem(`grocery_edits_${weekKey}`, JSON.stringify(state.edits || {}));
+  localStorage.setItem(`grocery_deletes_${weekKey}`, JSON.stringify(state.deletes || {}));
+}
+
+export async function loadGroceryListState(weekKey) {
+  if (!firebaseEnabled || !householdId) {
+    return readListStateFromLocal(weekKey);
+  }
+  const doc = await col('groceryListState').doc(weekKey).get();
+  if (doc.exists) {
+    const data = doc.data();
+    return {
+      checked: data.checked || {},
+      edits: data.edits || {},
+      deletes: data.deletes || {},
+    };
+  }
+  // First sync for this week — migrate localStorage if it has anything.
+  const local = readListStateFromLocal(weekKey);
+  const hasLocal = Object.keys(local.checked).length
+    || Object.keys(local.edits).length
+    || Object.keys(local.deletes).length;
+  if (hasLocal) {
+    await saveGroceryListState(weekKey, local);
+  }
+  return local;
+}
+
+export async function saveGroceryListState(weekKey, state) {
+  writeListStateToLocal(weekKey, state);
+  if (!firebaseEnabled || !householdId) return;
+  await col('groceryListState').doc(weekKey).set({
+    checked: state.checked || {},
+    edits: state.edits || {},
+    deletes: state.deletes || {},
+    updated: Date.now(),
+  });
+}
+
+// === Grocery Extras Checked (per-week checkbox state for extras) ===
+
+export async function loadGroceryExtrasChecked(weekKey) {
+  const localKey = weekKey ? `grocery_extras_checked_${weekKey}` : 'grocery_extras_checked';
+  if (!firebaseEnabled || !householdId) {
+    return JSON.parse(localStorage.getItem(localKey) || '{}');
+  }
+  const docId = weekKey || 'default';
+  const doc = await col('groceryExtrasChecked').doc(docId).get();
+  if (doc.exists) return doc.data().checked || {};
+  // Migrate localStorage on first sync.
+  const local = JSON.parse(localStorage.getItem(localKey) || '{}');
+  if (Object.keys(local).length) {
+    await saveGroceryExtrasChecked(weekKey, local);
+  }
+  return local;
+}
+
+export async function saveGroceryExtrasChecked(weekKey, checked) {
+  const localKey = weekKey ? `grocery_extras_checked_${weekKey}` : 'grocery_extras_checked';
+  localStorage.setItem(localKey, JSON.stringify(checked));
+  if (!firebaseEnabled || !householdId) return;
+  const docId = weekKey || 'default';
+  await col('groceryExtrasChecked').doc(docId).set({
+    checked,
+    updated: Date.now(),
+  });
+}
+
+// === Grocery Category Overrides (cross-week, single settings doc) ===
+
+let _cachedCategoryOverrides = {};
+
+export async function loadCategoryOverrides() {
+  if (!firebaseEnabled || !householdId) {
+    _cachedCategoryOverrides = JSON.parse(localStorage.getItem('grocery_category_overrides') || '{}');
+    return _cachedCategoryOverrides;
+  }
+  const doc = await col('settings').doc('groceryCategoryOverrides').get();
+  if (doc.exists) {
+    _cachedCategoryOverrides = doc.data().overrides || {};
+    return _cachedCategoryOverrides;
+  }
+  // Migrate localStorage on first sync.
+  const local = JSON.parse(localStorage.getItem('grocery_category_overrides') || '{}');
+  _cachedCategoryOverrides = local;
+  if (Object.keys(local).length) {
+    await saveCategoryOverrides(local);
+  }
+  return local;
+}
+
+export function getCachedCategoryOverrides() {
+  return _cachedCategoryOverrides;
+}
+
+export async function saveCategoryOverrides(overrides) {
+  _cachedCategoryOverrides = overrides;
+  localStorage.setItem('grocery_category_overrides', JSON.stringify(overrides));
+  if (!firebaseEnabled || !householdId) return;
+  await col('settings').doc('groceryCategoryOverrides').set({
+    overrides,
+    updated: Date.now(),
+  });
+}
+
 // === User Tag Definitions (household-scoped list of custom tag names) ===
 
 export async function loadUserTagDefinitions() {
