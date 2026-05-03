@@ -2061,12 +2061,57 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .grocery-item-actions {
   display: flex;
   gap: 0.1rem;
-  opacity: 0;
+  opacity: 0.5;
   transition: opacity 0.15s;
   flex-shrink: 0;
 }
 .grocery-checklist-items li:hover .grocery-item-actions {
   opacity: 1;
+}
+.grocery-move-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  line-height: 1;
+}
+.grocery-move-btn:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+.grocery-category-picker {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  z-index: 1000;
+  min-width: 180px;
+}
+.grocery-category-option {
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+.grocery-category-option:hover {
+  background: var(--bg);
+}
+.grocery-category-option.current {
+  font-weight: 600;
+  color: var(--accent, var(--text));
+}
+.grocery-category-option.current::before {
+  content: '✓ ';
 }
 .grocery-delete-btn {
   background: none;

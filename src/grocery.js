@@ -70,6 +70,10 @@ function renderChecklist(container, meals) {
   const deletes = JSON.parse(localStorage.getItem(deletesKey) || '{}');
 
   const CATEGORY_KEYS = { 'Produce': 'produce', 'Meat & Seafood': 'meat', 'Dairy & Eggs': 'dairy', 'Pantry': 'pantry', 'Spices & Seasonings': 'spices', 'Other': 'other' };
+  const CATEGORY_OPTIONS = [
+    ['produce', 'Produce'], ['meat', 'Meat & Seafood'], ['dairy', 'Dairy & Eggs'],
+    ['pantry', 'Pantry'], ['spices', 'Spices & Seasonings'], ['other', 'Other'],
+  ];
 
   let html = '';
   for (const [category, items] of groups) {
@@ -96,6 +100,7 @@ function renderChecklist(container, meals) {
         <span class="grocery-item-text" data-key="${escAttr(key)}" data-display="${escAttr(displayText)}" title="Tap to edit">${escHtml(displayText)}</span>
         ${mealNote}
         <div class="grocery-item-actions">
+          <button class="grocery-move-btn" data-key="${escAttr(key)}" data-section="${catKey}" title="Move to another section" aria-label="Move to another section">⇅</button>
           <button class="grocery-delete-btn" data-key="${escAttr(key)}" title="Remove">&times;</button>
         </div>
       </li>`;
@@ -160,6 +165,14 @@ function renderChecklist(container, meals) {
       allDeletes[btn.dataset.key] = true;
       localStorage.setItem(deletesKey, JSON.stringify(allDeletes));
       renderChecklist(container, meals);
+    });
+  });
+
+  // Wire up move buttons (open a category picker)
+  container.querySelectorAll('.grocery-move-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCategoryPicker(btn, btn.dataset.key, btn.dataset.section, CATEGORY_OPTIONS, () => renderChecklist(container, meals));
     });
   });
 
@@ -766,6 +779,13 @@ function categorizeIngredient(ing) {
 
   // Check multi-word overrides first (resolves conflicts like "garlic bread" → pantry not produce)
   const overrides = [
+    // Fresh beans → produce. Must come before the generic 'beans' → pantry rule
+    // below so "green beans" doesn't get caught by the dried/canned bean bucket.
+    ['green bean', 'produce'], ['string bean', 'produce'], ['snap bean', 'produce'],
+    ['wax bean', 'produce'], ['runner bean', 'produce'], ['long bean', 'produce'],
+    ['haricot vert', 'produce'],
+    // Bread-aisle items that don't otherwise match 'bread' explicitly
+    ['pita', 'pantry'], ['english muffin', 'pantry'], ['bagel', 'pantry'],
     ['garlic bread', 'pantry'], ['garlic salt', 'spices'], ['garlic powder', 'spices'],
     ['onion powder', 'spices'], ['onion ring', 'pantry'],
     ['tomato paste', 'pantry'], ['tomato sauce', 'pantry'], ['diced tomato', 'pantry'], ['crushed tomato', 'pantry'],
@@ -827,6 +847,64 @@ function saveCategoryOverride(ingredientKey, category) {
   const overrides = getCategoryOverrides();
   overrides[ingredientKey] = category;
   localStorage.setItem(CATEGORY_OVERRIDES_KEY, JSON.stringify(overrides));
+}
+
+// Inline picker for moving an item to a different category section.
+// Anchored under the move button; closes on outside click or Escape.
+function openCategoryPicker(anchorBtn, ingredientKey, currentSection, options, onPick) {
+  // Close any picker that's already open
+  document.querySelectorAll('.grocery-category-picker').forEach(p => p.remove());
+
+  const picker = document.createElement('div');
+  picker.className = 'grocery-category-picker';
+  picker.innerHTML = options.map(([key, label]) => {
+    const isCurrent = key === currentSection;
+    return `<button type="button" class="grocery-category-option${isCurrent ? ' current' : ''}" data-cat="${key}">${label}</button>`;
+  }).join('');
+
+  document.body.appendChild(picker);
+
+  // Position below the anchor button. Use viewport coords + page scroll so
+  // the picker stays anchored even if the page is scrolled.
+  const rect = anchorBtn.getBoundingClientRect();
+  picker.style.position = 'absolute';
+  picker.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  // Keep the picker inside the viewport horizontally
+  const pickerWidth = picker.offsetWidth;
+  let left = rect.right + window.scrollX - pickerWidth;
+  if (left < 8) left = 8;
+  picker.style.left = left + 'px';
+
+  picker.querySelectorAll('.grocery-category-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cat = opt.dataset.cat;
+      saveCategoryOverride(ingredientKey, cat);
+      picker.remove();
+      onPick();
+    });
+  });
+
+  // Close on outside click or Escape
+  const onOutside = (e) => {
+    if (!picker.contains(e.target) && e.target !== anchorBtn) {
+      picker.remove();
+      document.removeEventListener('click', onOutside, true);
+      document.removeEventListener('keydown', onKey);
+    }
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      picker.remove();
+      document.removeEventListener('click', onOutside, true);
+      document.removeEventListener('keydown', onKey);
+    }
+  };
+  // Defer so the click that opened the picker doesn't immediately close it
+  setTimeout(() => {
+    document.addEventListener('click', onOutside, true);
+    document.addEventListener('keydown', onKey);
+  }, 0);
 }
 
 // === Text output for copy/share ===

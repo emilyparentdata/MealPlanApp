@@ -128,7 +128,7 @@ async function initApp(household) {
     });
   }
 
-  showPage('plan-view');
+  showPage(parsePageFromHash() || 'plan-view');
   appInitialized = true;
 }
 
@@ -641,6 +641,13 @@ function renderManageTags() {
 }
 
 // === Navigation ===
+const VALID_PAGES = ['plan-view', 'planner', 'grocery', 'manage'];
+
+function parsePageFromHash() {
+  const hash = window.location.hash.replace(/^#/, '');
+  return VALID_PAGES.includes(hash) ? hash : null;
+}
+
 function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => showPage(btn.dataset.page));
@@ -655,10 +662,25 @@ function setupNavigation() {
       showPage(navEl.dataset.navigate);
     }
   });
+
+  // Browser back/forward: close any open modal first, otherwise switch page.
+  // Page changes push a `{type:'page', page}` history entry; modals don't push,
+  // so a back from a modal pops the page entry — we close the modal and
+  // re-push so the URL stays in sync with what's visible.
+  window.addEventListener('popstate', (e) => {
+    const openModal = document.querySelector('.modal:not(.hidden)');
+    if (openModal) {
+      openModal.classList.add('hidden');
+      history.pushState({ type: 'page', page: currentPage }, '', '#' + currentPage);
+      return;
+    }
+    const pageId = (e.state && e.state.page) || parsePageFromHash() || 'plan-view';
+    showPage(pageId, { fromHistory: true });
+  });
 }
 
 let currentPage = 'plan-view';
-function showPage(pageId) {
+function showPage(pageId, opts = {}) {
   currentPage = pageId;
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
@@ -672,6 +694,16 @@ function showPage(pageId) {
   document.querySelectorAll('.nav-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.page === pageId);
   });
+
+  // Keep browser history in sync. Skip when the call originated from a
+  // popstate (we'd push the same entry we just popped) and when nothing
+  // changed (re-renders from settings changes shouldn't stack history).
+  if (!opts.fromHistory) {
+    const stateMatches = history.state && history.state.type === 'page' && history.state.page === pageId;
+    if (!stateMatches) {
+      history.pushState({ type: 'page', page: pageId }, '', '#' + pageId);
+    }
+  }
 
   // Sync planner week to match the week being viewed on This Week
   if (pageId === 'planner') {
