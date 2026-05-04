@@ -66,6 +66,7 @@ async function init() {
       }
     } catch (e) {
       console.error('Failed to load app:', e);
+      hideAll();
       document.getElementById('login-screen').classList.remove('hidden');
       showLoginError('Something went wrong loading your data. Please try signing in again.');
     }
@@ -76,6 +77,13 @@ function hideAll() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('household-setup').classList.add('hidden');
   document.getElementById('app-container').classList.add('hidden');
+  for (const id of ['login-error', 'household-error']) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.add('hidden');
+      el.textContent = '';
+    }
+  }
 }
 
 async function showApp(user, household) {

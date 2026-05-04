@@ -22,6 +22,9 @@ export function initFirebase() {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     auth = firebase.auth();
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => {
+      console.warn('Could not set auth persistence:', e);
+    });
     firebaseEnabled = true;
     console.log("Firebase connected.");
   } catch (e) {
